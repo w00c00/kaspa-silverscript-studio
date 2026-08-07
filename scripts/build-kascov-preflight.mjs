@@ -17,6 +17,17 @@ function run(command, args, options = {}) {
   execFileSync(command, args, { stdio: "inherit", ...options });
 }
 
+function packageIdentities(lock) {
+  return lock
+    .replace(/\r\n/g, "\n")
+    .split(/\n(?=\[\[package\]\]\n)/)
+    .filter((section) => section.startsWith("[[package]]\n"))
+    .map((section) => {
+      const field = (name) => section.match(new RegExp(`^${name} = "([^"]*)"$`, "m"))?.[1] || "";
+      return JSON.stringify([field("name"), field("version"), field("source"), field("checksum")]);
+    });
+}
+
 if (!fs.existsSync(path.join(work, ".git"))) {
   fs.rmSync(work, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(work), { recursive: true });
@@ -65,18 +76,20 @@ const buildArgs = [
   "--bin", "kascov-preflight"
 ];
 // Cargo must first register the injected local package in the upstream lockfile.
-// The existing lockfile supplies every external resolution. We then remove only
-// that local package stanza and require the rest to match the pinned file byte
-// for byte before repeating the build under --locked.
+// The existing lockfile supplies every external resolution. Target-specific
+// dependency sections can be rewritten on Windows, so compare immutable package
+// identities instead of formatting: every pinned name/version/source/checksum
+// tuple must remain present before repeating the build under --locked.
 run("cargo", buildArgs, { env: { ...process.env, CARGO_TARGET_DIR: targetDirectory } });
 const updatedLock = fs.readFileSync(lockFile, "utf8");
-const escapedPackageName = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const localPackagePattern = new RegExp(`\\n\\[\\[package\\]\\]\\nname = "${escapedPackageName}"\\n[\\s\\S]*?(?=\\n\\[\\[package\\]\\]|\\s*$)`);
-const normalizedUpdatedLock = updatedLock.replace(/\\r\\n/g, "\\n");
-const normalizedPinnedLock = pinnedLock.replace(/\\r\\n/g, "\\n");
-const lockWithoutLocalPackage = normalizedUpdatedLock.replace(localPackagePattern, "");
-if (lockWithoutLocalPackage === normalizedUpdatedLock) throw new Error("Cargo did not register the local Kascov preflight package");
-if (lockWithoutLocalPackage !== normalizedPinnedLock) throw new Error("Pinned Kascov dependency lockfile drifted while adding the local preflight package");
+const pinnedPackages = packageIdentities(pinnedLock);
+const updatedPackages = new Set(packageIdentities(updatedLock));
+for (const identity of pinnedPackages) {
+  if (!updatedPackages.has(identity)) throw new Error(`Pinned Kascov dependency drifted while adding the local preflight package: ${identity}`);
+}
+if (![...updatedPackages].some((identity) => JSON.parse(identity)[0] === packageName)) {
+  throw new Error("Cargo did not register the local Kascov preflight package");
+}
 run("cargo", [
   "build",
   "--locked",
