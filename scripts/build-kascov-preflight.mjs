@@ -72,9 +72,11 @@ run("cargo", buildArgs, { env: { ...process.env, CARGO_TARGET_DIR: targetDirecto
 const updatedLock = fs.readFileSync(lockFile, "utf8");
 const escapedPackageName = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const localPackagePattern = new RegExp(`\\n\\[\\[package\\]\\]\\nname = "${escapedPackageName}"\\n[\\s\\S]*?(?=\\n\\[\\[package\\]\\]|\\s*$)`);
-const lockWithoutLocalPackage = updatedLock.replace(localPackagePattern, "");
-if (lockWithoutLocalPackage === updatedLock) throw new Error("Cargo did not register the local Kascov preflight package");
-if (lockWithoutLocalPackage !== pinnedLock) throw new Error("Pinned Kascov dependency lockfile drifted while adding the local preflight package");
+const normalizedUpdatedLock = updatedLock.replace(/\\r\\n/g, "\\n");
+const normalizedPinnedLock = pinnedLock.replace(/\\r\\n/g, "\\n");
+const lockWithoutLocalPackage = normalizedUpdatedLock.replace(localPackagePattern, "");
+if (lockWithoutLocalPackage === normalizedUpdatedLock) throw new Error("Cargo did not register the local Kascov preflight package");
+if (lockWithoutLocalPackage !== normalizedPinnedLock) throw new Error("Pinned Kascov dependency lockfile drifted while adding the local preflight package");
 run("cargo", [
   "build",
   "--locked",
