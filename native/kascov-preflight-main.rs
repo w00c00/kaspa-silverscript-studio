@@ -5,12 +5,42 @@
 //! stdin and writes a single JSON report to stdout. It never connects to a
 //! node, reads keys, broadcasts, or persists input.
 
-#[path = "../preflight.rs"]
+#[path = "preflight.rs"]
 mod preflight;
 
-use kascov_core::Network;
+use std::fmt;
 use std::io::{self, Read};
 use std::str::FromStr;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Network {
+    Mainnet,
+    Testnet(u32),
+}
+
+impl fmt::Display for Network {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Mainnet => formatter.write_str("mainnet"),
+            Self::Testnet(suffix) => write!(formatter, "testnet-{suffix}"),
+        }
+    }
+}
+
+impl FromStr for Network {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "mainnet" => Ok(Self::Mainnet),
+            _ => value
+                .strip_prefix("testnet-")
+                .and_then(|suffix| suffix.parse().ok())
+                .map(Self::Testnet)
+                .ok_or_else(|| format!("invalid network: {value}")),
+        }
+    }
+}
 
 fn main() {
     if let Err(error) = run() {

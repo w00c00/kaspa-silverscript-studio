@@ -11,6 +11,7 @@ const commit = process.env.KASCOV_COMMIT || "b64d6b4114df324f899783080371f26b619
 const work = path.resolve(process.env.KASCOV_BUILD_DIR || path.join(root, ".build", `kascov-${commit}`));
 const targetDirectory = path.resolve(process.env.CARGO_TARGET_DIR || path.join(root, ".build", "kascov-target"));
 const output = path.join(root, "bin", executableName("kascov-preflight"));
+const packageName = "studio-kascov-preflight";
 
 function run(command, args, options = {}) {
   execFileSync(command, args, { stdio: "inherit", ...options });
@@ -24,16 +25,60 @@ if (!fs.existsSync(path.join(work, ".git"))) {
 
 run("git", ["-C", work, "fetch", "--depth", "1", "origin", commit]);
 run("git", ["-C", work, "checkout", "--detach", "--force", commit]);
-const sourceDirectory = path.join(work, "crates", "kascov", "src", "bin");
+const lockFile = path.join(work, "Cargo.lock");
+const pinnedLock = fs.readFileSync(lockFile, "utf8");
+const crateDirectory = path.join(work, "crates", packageName);
+const sourceDirectory = path.join(crateDirectory, "src");
 fs.mkdirSync(sourceDirectory, { recursive: true });
-fs.copyFileSync(path.join(root, "native", "kascov-preflight-main.rs"), path.join(sourceDirectory, "kascov-preflight.rs"));
+fs.copyFileSync(path.join(root, "native", "kascov-preflight-main.rs"), path.join(sourceDirectory, "main.rs"));
+const upstreamPreflightFile = path.join(work, "crates", "kascov", "src", "preflight.rs");
+const upstreamPreflight = fs.readFileSync(upstreamPreflightFile, "utf8");
+if (!upstreamPreflight.includes("use kascov_core::Network;")) throw new Error("Pinned Kascov preflight source has an unexpected Network import");
+fs.writeFileSync(path.join(sourceDirectory, "preflight.rs"), upstreamPreflight.replace("use kascov_core::Network;", "use crate::Network;"));
+fs.writeFileSync(path.join(crateDirectory, "Cargo.toml"), `[package]
+name = "${packageName}"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kascov-decode = { workspace = true }
+kascov-sim = { workspace = true }
+kaspa-consensus-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+hex = { workspace = true }
+
+[[bin]]
+name = "kascov-preflight"
+path = "src/main.rs"
+`);
+const workspaceManifestFile = path.join(work, "Cargo.toml");
+const workspaceManifest = fs.readFileSync(workspaceManifestFile, "utf8");
+if (!workspaceManifest.includes("members = [")) throw new Error("Pinned Kascov workspace manifest has an unexpected members declaration");
+fs.writeFileSync(workspaceManifestFile, workspaceManifest.replace("members = [", `members = ["crates/${packageName}", `));
+const buildArgs = [
+  "build",
+  "--manifest-path", workspaceManifestFile,
+  "--release",
+  "-p", packageName,
+  "--bin", "kascov-preflight"
+];
+// Cargo must first register the injected local package in the upstream lockfile.
+// The existing lockfile supplies every external resolution. We then remove only
+// that local package stanza and require the rest to match the pinned file byte
+// for byte before repeating the build under --locked.
+run("cargo", buildArgs, { env: { ...process.env, CARGO_TARGET_DIR: targetDirectory } });
+const updatedLock = fs.readFileSync(lockFile, "utf8");
+const escapedPackageName = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const localPackagePattern = new RegExp(`\\n\\[\\[package\\]\\]\\nname = "${escapedPackageName}"\\n[\\s\\S]*?(?=\\n\\[\\[package\\]\\]|\\s*$)`);
+const lockWithoutLocalPackage = updatedLock.replace(localPackagePattern, "");
+if (lockWithoutLocalPackage === updatedLock) throw new Error("Cargo did not register the local Kascov preflight package");
+if (lockWithoutLocalPackage !== pinnedLock) throw new Error("Pinned Kascov dependency lockfile drifted while adding the local preflight package");
 run("cargo", [
   "build",
-  "--manifest-path", path.join(work, "Cargo.toml"),
   "--locked",
-  "--release",
-  "-p", "kascov",
-  "--bin", "kascov-preflight"
+  ...buildArgs.slice(1)
 ], { env: { ...process.env, CARGO_TARGET_DIR: targetDirectory } });
 fs.mkdirSync(path.dirname(output), { recursive: true });
 fs.copyFileSync(cargoReleaseBinary(targetDirectory, "kascov-preflight"), output);
