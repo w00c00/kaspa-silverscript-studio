@@ -27,6 +27,7 @@ import { CovenantStateSource, covenantStateProvider, verifyCovenantStateCandidat
 import { createP2pkCoSpendAuthorization, selectP2pkFundingUtxo, signP2pkCoSpendPackage } from "../server/p2pk-cospend.mjs";
 import { buildAtomicCovenantPackage } from "../server/atomic-covenant-builder.mjs";
 import { canonicalKcc721Metadata } from "../src/kcc721-metadata.js";
+import { binaryRelativePath, cargoReleaseBinary, executableName } from "../scripts/platform-binaries.mjs";
 
 const require = createRequire(import.meta.url);
 const kaspa = require("@kluster/kaspa-wasm");
@@ -98,6 +99,17 @@ test("language detection respects manual choice, system language and time-zone f
 test("desktop runtime includes server-imported KCC721 metadata code", () => {
   const prepareDesktop = fs.readFileSync(new URL("../scripts/prepare-desktop-runtime.mjs", import.meta.url), "utf8");
   assert.match(prepareDesktop, /src\/kcc721-metadata\.js/);
+});
+
+test("desktop helpers use native executable names on Windows and Unix", () => {
+  assert.equal(executableName("silverc-latest", "win32"), "silverc-latest.exe");
+  assert.equal(executableName("silverc-latest", "linux"), "silverc-latest");
+  assert.equal(binaryRelativePath("kascov-preflight", "win32"), "bin/kascov-preflight.exe");
+  assert.equal(binaryRelativePath("kascov-preflight", "darwin"), "bin/kascov-preflight");
+  assert.equal(cargoReleaseBinary("target", "silverc", "win32"), path.join("target", "release", "silverc.exe"));
+  const rustLauncher = fs.readFileSync(new URL("../src-tauri/src/lib.rs", import.meta.url), "utf8");
+  assert.match(rustLauncher, /KASCOV_PREFLIGHT_BIN/);
+  assert.match(rustLauncher, /cfg!\(windows\)/);
 });
 
 test("AI package retains explicit transaction plans and stays experimental", () => {
@@ -1132,6 +1144,15 @@ test("heuristic triage returns structured findings", async () => {
   const analysis = await staticAnalyze(SAMPLE_SOURCE);
   assert.equal(analysis.kind, "heuristic-triage");
   assert.ok(Array.isArray(analysis.findings));
+  const risky = await staticAnalyze(`pragma silverscript ^0.1.0;
+contract Risky() {
+  policy spend(...) -> (next_states: State[]) termination = allowed {
+    validateOutputStateWithTemplate(outputIndex, template);
+    require(tx.outputs[feeOutputIndex].scriptPubKey == expectedScript);
+    return next_states;
+  }
+}`);
+  assert.deepEqual(risky.findings.map((finding) => finding.code), ["SS001", "SS002", "SS003", "SS004"]);
 });
 
 test("deployment builder rejects source edited after compilation before network access", async () => {

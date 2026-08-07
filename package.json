@@ -1,6 +1,6 @@
 {
   "name": "kaspa-silverscript-studio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Local bilingual AI-assisted SilverScript contract studio for Kaspa",
@@ -10,8 +10,8 @@
     "start": "node server/index.mjs",
     "check": "node scripts/check-syntax.mjs",
     "test": "node --test",
-    "setup:silverc": "bash scripts/build-silverc.sh",
-    "setup:kascov-preflight": "bash scripts/build-kascov-preflight.sh",
+    "setup:silverc": "node scripts/build-silverc.mjs",
+    "setup:kascov-preflight": "node scripts/build-kascov-preflight.mjs",
     "verify": "npm run check && npm test && npm run build",
     "desktop:prepare": "npm run build && node scripts/prepare-desktop-runtime.mjs",
     "desktop:dev": "tauri dev",

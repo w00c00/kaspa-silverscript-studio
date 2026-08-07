@@ -90,7 +90,7 @@ cd kaspa-silverscript-studio
 npm ci
 ```
 
-首次运行需要在当前系统构建固定版本的两个原生工具：
+首次运行需要在当前系统构建固定版本的两个原生工具。以下命令由 Node.js 驱动，可直接用于 macOS、Windows 和 Linux：
 
 ```bash
 npm run setup:silverc
@@ -149,9 +149,9 @@ npm run desktop:build
 - 固定版本本地预检引擎。
 - Kaspa WASM、契约模板、知识库和第三方许可证。
 
-原生安装包应在对应系统上构建和测试。macOS、Windows 和 Linux 的二进制不能互相替代，公开发行前还需要完成各平台的代码签名。当前 GitHub Release 提供经过验证的 macOS Apple Silicon 构建；Windows 和 Linux 安装包在完成对应平台验证后发布。
+原生安装包必须在对应系统上构建和测试，macOS、Windows 和 Linux 的二进制不能互相替代。v0.2.1 发布流程在原生 GitHub Runner 上分别生成 macOS Apple Silicon DMG、Windows x64 NSIS/MSI，以及 Linux x86_64 DEB/AppImage，并附带 SHA-256 校验文件。
 
-> Windows 状态：当前原生辅助工具安装脚本仍使用 Bash 和 Unix 无后缀文件名，Windows `.exe` 路径尚未完成发行验证。完成对应修复和 Windows Runner 验证前，请不要把当前源码描述为已经验证的 Windows 发行版。
+公开包目前没有商业代码签名：macOS 使用 ad-hoc 签名且未公证，Windows 未进行 Authenticode 签名，Linux 未进行发行版签名。首次启动可能出现系统安全提示；请只从本仓库 Release 下载并核对 SHA-256。
 
 ### 自动语言识别
 
@@ -336,7 +336,7 @@ cd kaspa-silverscript-studio
 npm ci
 ```
 
-Build the two pinned native tools for the current platform:
+Build the two pinned native tools for the current platform. These Node.js-driven commands run directly on macOS, Windows, and Linux:
 
 ```bash
 npm run setup:silverc
@@ -375,9 +375,9 @@ npm run desktop:build
 
 The desktop bundle contains the frontend, local Node.js sidecar, pinned `silverc`, pinned local preflight engine, Kaspa WASM, templates, knowledge resources, and third-party license notices.
 
-Build and test native installers on their target operating systems. macOS, Windows, and Linux binaries are not interchangeable, and public releases require platform-appropriate code signing. The current GitHub Release contains a verified macOS Apple Silicon build; Windows and Linux installers will be published after target-platform verification.
+Native installers must be built and tested on their target operating systems; macOS, Windows, and Linux binaries are not interchangeable. The v0.2.1 release pipeline produces a macOS Apple Silicon DMG, Windows x64 NSIS/MSI packages, and Linux x86_64 DEB/AppImage packages on native GitHub Runners, with SHA-256 checksum files.
 
-> Windows status: the current native-helper setup scripts still use Bash and extensionless Unix paths. Windows `.exe` wiring has not completed release validation. Do not present the current source as a verified Windows release until that adaptation and Windows Runner verification are complete.
+The public packages are not commercially code-signed: macOS is ad-hoc signed and not notarized, Windows is not Authenticode-signed, and Linux is not distribution-signed. The operating system may show a warning on first launch. Download only from this repository's Releases and verify the SHA-256 checksum.
 
 ### Automatic language selection
 

@@ -1,0 +1,158 @@
+name: Desktop release
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            os: macos-14
+            platform: macos
+          - name: Windows x64
+            os: windows-latest
+            platform: windows
+          - name: Linux x86_64
+            os: ubuntu-22.04
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            file \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            patchelf \
+            pkg-config \
+            wget
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Build pinned SilverScript compilers
+        run: npm run setup:silverc
+
+      - name: Build pinned local preflight engine
+        run: npm run setup:kascov-preflight
+
+      - name: Verify application and native helpers
+        run: npm run verify
+
+      - name: Build macOS DMG
+        if: matrix.platform == 'macos'
+        env:
+          APPLE_SIGNING_IDENTITY: '-'
+        run: npm run desktop:build -- --bundles dmg
+
+      - name: Stage macOS artifact
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          artifact="$(find src-tauri/target/release/bundle/dmg -name '*.dmg' -print -quit)"
+          test -n "$artifact"
+          mkdir -p release-assets
+          cp "$artifact" "release-assets/Kaspa-SilverScript-Studio-${version}-macos-arm64.dmg"
+
+      - name: Build Windows installers
+        if: matrix.platform == 'windows'
+        run: npm run desktop:build -- --bundles nsis,msi
+
+      - name: Stage Windows artifacts
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $msi = Get-ChildItem "src-tauri/target/release/bundle/msi" -Filter "*.msi" | Select-Object -First 1
+          $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1
+          if (-not $msi -or -not $setup) { throw "Windows MSI or NSIS installer is missing" }
+          New-Item -ItemType Directory -Force -Path "release-assets" | Out-Null
+          Copy-Item $msi.FullName "release-assets/Kaspa-SilverScript-Studio-$version-windows-x64.msi"
+          Copy-Item $setup.FullName "release-assets/Kaspa-SilverScript-Studio-$version-windows-x64-setup.exe"
+
+      - name: Build Linux packages
+        if: matrix.platform == 'linux'
+        run: npm run desktop:build -- --bundles deb,appimage
+
+      - name: Stage Linux artifacts
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          deb="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          appimage="$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' -print -quit)"
+          test -n "$deb"
+          test -n "$appimage"
+          mkdir -p release-assets
+          cp "$deb" "release-assets/Kaspa-SilverScript-Studio-${version}-linux-amd64.deb"
+          cp "$appimage" "release-assets/Kaspa-SilverScript-Studio-${version}-linux-x86_64.AppImage"
+          chmod +x "release-assets/Kaspa-SilverScript-Studio-${version}-linux-x86_64.AppImage"
+
+      - name: Record artifact hashes
+        run: node scripts/write-release-checksums.mjs release-assets "${{ matrix.platform }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release and upload native packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          test -f "$notes"
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --latest \
+            --title "Kaspa SilverScript Studio ${GITHUB_REF_NAME}" \
+            --notes-file "$notes"

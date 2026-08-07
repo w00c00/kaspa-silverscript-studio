@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.2.0"
+version = "0.2.1"
 description = "Local-first Kaspa SilverScript covenant workbench"
 authors = ["w00c00"]
 license = "MIT"

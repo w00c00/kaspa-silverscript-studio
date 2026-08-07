@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1 — 2026-08-07
+
+- Added native Windows x64 and Linux x86_64 desktop build and release pipelines alongside macOS Apple Silicon.
+- Replaced Bash-only helper builds with portable Node.js scripts and added Windows `.exe` runtime wiring for `silverc` and `kascov-preflight`.
+- Removed the installed application's Python dependency by porting heuristic contract triage to built-in JavaScript.
+- Added target-OS tests, native helper verification, platform packages, and SHA-256 release manifests.
+
+## 0.2.1 — 2026-08-07（中文）
+
+- 在 macOS Apple Silicon 之外增加 Windows x64 与 Linux x86_64 原生桌面构建和发布流程。
+- 将仅支持 Bash 的辅助工具构建改为跨平台 Node.js 脚本，并补齐 Windows 下 `silverc` 与 `kascov-preflight` 的 `.exe` 运行时路径。
+- 将轻量契约扫描移植到内置 JavaScript，移除安装后应用对 Python 的依赖。
+- 增加目标操作系统测试、原生辅助工具验证、平台安装包和 SHA-256 发布清单。
+
 ## 0.2.0 — 2026-08-06
 
 - Upgraded the default pinned official SilverScript compiler to `4b0e1cd69739934f92c3ac4df1bb13d912418b2b`; retained `2a3961c` as a SHA-256-pinned legacy reproducibility profile.

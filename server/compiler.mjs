@@ -181,27 +181,61 @@ export function migrateSourceToProfile(source, targetProfileId = config.compiler
   };
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export async function staticAnalyze(source) {
   const text = boundedText(source, "contract source");
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "silverstudio-audit-"));
-  const sourceFile = path.join(directory, "contract.sil");
-  try {
-    fs.writeFileSync(sourceFile, text, { mode: 0o600 });
-    const script = path.join(config.root, "knowledge", "kaspa-silverscript", "scripts", "audit_silverscript.py");
-    const { stdout } = await execFileAsync("python3", [script, sourceFile], { timeout: 20_000, maxBuffer: 2_000_000 });
-    const findings = String(stdout || "").split("\n").map((line) => {
-      const match = line.match(/:(\d+):\s+(SS\d+):\s+(.+)$/);
-      return match ? { line: Number(match[1]), code: match[2], message: match[3] } : null;
-    }).filter(Boolean);
-    return {
-      kind: "heuristic-triage",
-      findings,
-      findingCount: findings.length,
-      note: "Static pattern triage only; successful output is not compilation or a security proof."
-    };
-  } finally {
-    fs.rmSync(directory, { recursive: true, force: true });
+  const findings = [];
+  const line = (offset) => text.slice(0, offset).split("\n").length;
+  const crossTemplate = /validateOutputStateWithTemplate\s*\(\s*([^,\n]+)/g;
+  let match;
+  while ((match = crossTemplate.exec(text))) {
+    const argument = match[1].trim();
+    const escaped = escapeRegExp(argument);
+    const direct = argument.includes("OpCovOutputIdx");
+    const idGuard = new RegExp(`OpOutputCovenantId\\s*\\(\\s*${escaped}\\s*\\)`).test(text);
+    const derived = new RegExp(`\\b${escaped}\\s*=\\s*OpCovOutputIdx\\s*\\(`).test(text);
+    if (!direct && !idGuard && !derived) {
+      findings.push({
+        code: "SS001",
+        line: line(match.index),
+        message: `cross-template output '${argument}' is not visibly bound to a covenant ID`
+      });
+    }
   }
+  const scriptComparison = /scriptPubKey\s*==\s*(?!byte\[\]\s*\()([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)/g;
+  while ((match = scriptComparison.exec(text))) {
+    findings.push({
+      code: "SS002",
+      line: line(match.index),
+      message: `scriptPubKey comparison with '${match[1]}' may mix byte[] and fixed bytes`
+    });
+  }
+  if (text.includes("termination = allowed")
+    && /return\s*\(?\s*next_states\s*\)?\s*;/.test(text)
+    && !/next_states\.length\s*==\s*0/.test(text)) {
+    findings.push({
+      code: "SS003",
+      line: line(text.indexOf("termination = allowed")),
+      message: "termination path returns caller-supplied state without requiring termination"
+    });
+  }
+  const feeOutput = /tx\.outputs\s*\[\s*fee\w*Index\s*\]/i.exec(text);
+  if (feeOutput) {
+    findings.push({
+      code: "SS004",
+      line: line(feeOutput.index),
+      message: "review fee-output aliasing across multiple contract executions"
+    });
+  }
+  return {
+    kind: "heuristic-triage",
+    findings,
+    findingCount: findings.length,
+    note: "Static pattern triage only; successful output is not compilation or a security proof."
+  };
 }
 
 export async function compileContract({ source, constructorArgs = [], compilerProfileId = config.compiler.defaultProfileId }) {
