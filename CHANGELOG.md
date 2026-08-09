@@ -9,6 +9,7 @@
 - Fixed stale toolchain commit text, stale “no work open” state, and non-localized template project names; applying a template now preserves the user's project name.
 - Improved wallet onboarding after the one-time recovery backup by selecting the new wallet and explicitly focusing the password-to-connect step without retaining the password.
 - Updated vulnerable transitive `postcss` and `nanoid` versions; `npm audit` now reports zero known vulnerabilities.
+- Updated the official GitHub Actions used by the desktop release pipeline to their current Node 24-based majors.
 
 ## 0.2.6 — 2026-08-09（中文）
 
@@ -19,6 +20,7 @@
 - 修复工具链提交号陈旧、已打开项目仍显示“没有打开的工作”、模板项目名称未本地化；应用模板时不再覆盖用户自定义项目名。
 - 改进一次性助记词备份后的钱包引导：自动选中新钱包并聚焦重新输入密码连接，同时不保留钱包密码。
 - 更新存在安全公告的间接依赖 `postcss` 与 `nanoid`；`npm audit` 现为零已知漏洞。
+- 将桌面发布流水线使用的 GitHub 官方 Actions 升级到当前基于 Node 24 的主版本。
 
 ## 0.2.5 — 2026-08-07
 
