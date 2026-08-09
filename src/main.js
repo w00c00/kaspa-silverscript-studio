@@ -325,7 +325,7 @@ function loadProjectIntoUi(project) {
   $("#constructor-args").value = JSON.stringify(project.constructorArgs || [], null, 2);
   $("#compiler-profile").value = project.compilerProfileId || project.artifact?.compiler?.id || project.review?.compilerProfileId || state.config?.compiler?.defaultProfileId || "latest-cb34aa5";
   renderCompilerProfileHelp();
-  $("#deploy-amount").value = project.deployAmount || "0.05";
+  $("#deploy-amount").value = Number(project.deployAmount || 0) >= 0.5 ? project.deployAmount : "0.5";
   $("#deploy-network").value = project.network || "tn10";
   updateNetworkControls();
   sourceStats();
@@ -350,7 +350,7 @@ function showNoProject() {
   $("#requirements").value = "";
   $("#source-editor").value = "";
   $("#constructor-args").value = "[]";
-  $("#deploy-amount").value = "0.05";
+  $("#deploy-amount").value = "0.5";
   $("#no-project-banner").hidden = false;
   $("#save-label").textContent = state.language === "zh" ? "没有打开的工作" : "No work open";
   $("#save-dot").classList.remove("saving");
@@ -1405,7 +1405,17 @@ async function buildAndBroadcast() {
     pollEvidence(result);
   } catch (error) {
     $("#deploy-status").textContent = "FAILED";
-    toast(error.message, "bad");
+    const code = error.payload?.code;
+    const message = code === "COVENANT_AMOUNT_BELOW_STANDARD_MASS"
+      ? (state.language === "zh"
+        ? "Studio 为 Covenant 保留存储质量余量，要求至少锁定 0.5 TKAS/KAS。"
+        : "Studio requires at least 0.5 TKAS/KAS in a covenant cell to retain conservative storage-mass headroom.")
+      : code === "COVENANT_DEPLOYMENT_MASS_LIMIT"
+        ? (state.language === "zh"
+          ? "现有 UTXO 无法在标准质量上限内完成部署；请提高锁定金额或换用更合适的 UTXO。"
+          : "No available UTXO can fund this deployment within the standard mass limit; increase the locked amount or use a more suitable UTXO.")
+        : error.message;
+    toast(message, "bad");
   } finally { button.disabled = false; button.textContent = tr("buildDraft"); }
 }
 
@@ -1628,10 +1638,18 @@ async function buildLifecycleOperation() {
     renderLifecycleInvitationActions();
     $("#external-covenant-status").textContent = payload.review.complete ? "READY TO PREFLIGHT" : "AWAITING SIGNATURE";
     $("#lifecycle-status").textContent = "PACKAGE READY";
+    const feeNotice = payload.fee?.automaticallyAdjusted
+      ? (state.language === "zh"
+        ? `已按完整脚本质量把手续费自动调整为 ${payload.fee.actualKas} ${state.project.network === "mainnet" ? "KAS" : "TKAS"}`
+        : `Fee automatically adjusted to ${payload.fee.actualKas} ${state.project.network === "mainnet" ? "KAS" : "TKAS"} from the fully assembled script mass`)
+      : "";
+    if (payload.fee?.actualKas) $("#lifecycle-fee").value = payload.fee.actualKas;
     if (operation.signers) {
-      toast(state.language === "zh" ? "签名邀请已生成，请点击旁边的“下载邀请文件”" : "Signing invitation created; click Download invitation beside the build button", "good");
+      const invitationNotice = state.language === "zh" ? "签名邀请已生成，请点击旁边的“下载邀请文件”" : "Signing invitation created; click Download invitation beside the build button";
+      toast(feeNotice ? `${invitationNotice} · ${feeNotice}` : invitationNotice, "good");
       $("#lifecycle-download-invitation").scrollIntoView({ behavior: "smooth", block: "center" });
     } else {
+      if (feeNotice) toast(feeNotice, "good");
       $("#external-covenant-package").scrollIntoView({ behavior: "smooth", block: "center" });
     }
     return payload;

@@ -24,7 +24,7 @@
   "sourceFile": "contract.sil",
   "requiredReplacements": [0, 1, 2, 3],
   "parameters": [
-    { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.05", "minimum": "0.05", "labelZh": "锁定金额", "labelEn": "Locked amount", "helpZh": "创建哈希锁 Covenant UTXO 时锁定的 TKAS/KAS。", "helpEn": "TKAS/KAS locked in the hashlocked covenant UTXO." },
+    { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.5", "minimum": "0.5", "labelZh": "锁定金额", "labelEn": "Locked amount", "helpZh": "至少 0.5 TKAS/KAS，以满足当前标准存储质量限制。", "helpEn": "At least 0.5 TKAS/KAS to stay within the current standard storage-mass limit." },
     { "id": "senderAddress", "type": "address", "argIndex": 0, "required": true, "useConnectedWallet": true, "labelZh": "付款／超时退款钱包", "labelEn": "Sender / timeout refund wallet", "placeholderZh": "kaspatest:...", "placeholderEn": "kaspatest:..." },
     { "id": "recipientAddress", "type": "address", "argIndex": 1, "required": true, "labelZh": "收款／释放授权钱包", "labelEn": "Recipient / release wallet", "placeholderZh": "kaspatest:...", "placeholderEn": "kaspatest:..." },
     { "id": "secretHash", "type": "sha256", "argIndex": 2, "required": true, "labelZh": "秘密的 SHA-256 哈希", "labelEn": "SHA-256 hash of secret", "placeholderZh": "64 位十六进制哈希，不要填写秘密原文", "placeholderEn": "64 hex characters; never enter the secret itself", "helpZh": "这里只保存哈希。秘密原文是领取凭证，必须离线保管，不能提交给应用。", "helpEn": "Only the digest is stored. The preimage authorizes claiming and must remain offline." },

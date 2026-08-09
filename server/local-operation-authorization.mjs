@@ -6,6 +6,8 @@ function lifecycleStateError(message, code) {
   return Object.assign(new Error(message), { status: 409, code });
 }
 
+const MAX_PHRASE_FREE_RENEWAL_FEE = 2_000_000n;
+
 export function assertLocalRenewalOpen(status) {
   if (!status?.unspent) throw authorizationError("The local inheritance covenant is no longer unspent");
   if (status.schedule?.mature) throw authorizationError("The inheritance covenant has expired and can no longer be renewed");
@@ -41,7 +43,11 @@ export function assertLocalRenewalPackage(project, inspected, status = null) {
   if (review.outputCount !== 1 || review.outputs?.[0]?.covenantId !== review.covenantId) {
     throw authorizationError("Renewal must contain exactly one same-covenant continuation");
   }
-  if (review.feeSompi !== "1000000") throw authorizationError("Local one-click renewal fee must be exactly 0.01 TKAS");
+  let renewalFee;
+  try { renewalFee = BigInt(review.feeSompi); } catch { throw authorizationError("Local one-click renewal fee is invalid"); }
+  if (renewalFee < 1000n || renewalFee > MAX_PHRASE_FREE_RENEWAL_FEE) {
+    throw authorizationError("Local one-click renewal fee must be from 0.00001 to 0.02 TKAS");
+  }
   const activeTxid = String(project.deployment?.activeTxid || project.deployment?.txid || "").toLowerCase();
   if (!activeTxid || String(review.inputOutpoint?.transactionId || "").toLowerCase() !== activeTxid) {
     throw authorizationError("Renewal does not spend the current local project UTXO");

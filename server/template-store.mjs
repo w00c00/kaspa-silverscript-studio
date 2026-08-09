@@ -37,7 +37,7 @@ function publicKeyExpression(hex) {
   return compilerExpression({ kind: "pubkey", hex });
 }
 
-function parseAmount(value, minimum = "0.05") {
+function parseAmount(value, minimum = "0.5") {
   const text = String(value ?? "").trim();
   if (!/^(0|[1-9]\d*)(\.\d{1,8})?$/.test(text)) throw parameterError("Template amount must be a positive KAS decimal with at most 8 places");
   const [whole, fraction = ""] = text.split(".");
@@ -203,12 +203,12 @@ export class TemplateStore {
     const constructorArgs = template.constructorArgs.map((value) => structuredClone(value));
     const parameterEncodingVersion = Number(options.encodingVersion || template.parameterEncodingVersion || 1);
     const uniqueGroups = new Map();
-    let deployAmount = "0.05";
+    let deployAmount = "0.5";
     for (const field of definitions) {
       const raw = inputParameters?.[field.id];
       if ((raw === undefined || raw === null || String(raw).trim() === "") && field.required !== false) throw parameterError(`Template parameter is required: ${field.id}`);
       if (field.type === "amount") {
-        const value = parseAmount(raw, field.minimum || "0.05");
+        const value = parseAmount(raw, field.minimum || "0.5");
         parameters[field.id] = value;
         if (field.projectField === "deployAmount") deployAmount = value;
         if (Number.isInteger(field.argIndex)) {

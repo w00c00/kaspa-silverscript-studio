@@ -61,7 +61,8 @@ export function createP2pkCoSpendAuthorization({ network: networkId = "tn10", ad
       previousOutpoint: normalized.outpoint,
       signatureScript: "",
       sequence: 0n,
-      sigOpCount: 1,
+      // Toccata v1 inputs must leave the legacy sig-op field at zero.
+      sigOpCount: 0,
       computeBudget: 10,
       utxo: {
         address: walletAddress,

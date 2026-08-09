@@ -103,7 +103,9 @@ export function buildAtomicCovenantPackage({ network: networkId = "tn10", covena
       previousOutpoint: outpoint,
       signatureScript: "",
       sequence: BigInt(item.sequence || 0),
-      sigOpCount: Number(item.sigOpCount || 0),
+      // Toccata v1 inputs use computeBudget; a non-zero legacy sig-op field is
+      // rejected by current nodes before script execution.
+      sigOpCount: 0,
       computeBudget: Number(item.computeBudget || 120),
       utxo: transactionUtxo(utxo)
     };
@@ -139,7 +141,8 @@ export function buildAtomicCovenantPackage({ network: networkId = "tn10", covena
     gas: 0n,
     payload: ""
   });
-  const sigOps = Math.max(1, transactionInputs.reduce((sum, input) => sum + Number(input.sigOpCount || 0), 0));
+  const covenantSignatures = metadata.reduce((sum, item) => sum + (item.arguments || []).filter((argument) => argument?.kind === "signature").length, 0);
+  const sigOps = Math.max(1, covenantSignatures + (p2pkAuthorization?.input ? 1 : 0));
   if (!kaspa.updateTransactionMass(network.kaspaNetworkId, transaction, sigOps, true)) throw builderError("Atomic covenant transaction exceeds the current mass limit", "ATOMIC_MASS_LIMIT");
   return {
     version: 1,

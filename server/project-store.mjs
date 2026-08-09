@@ -54,7 +54,7 @@ export class ProjectStore {
       constructorArgs: Array.isArray(input.constructorArgs) ? input.constructorArgs : [],
       compilerProfileId: String(input.compilerProfileId || "latest-cb34aa5"),
       templateParameters: input.templateParameters && typeof input.templateParameters === "object" ? input.templateParameters : {},
-      deployAmount: String(input.deployAmount || "0.05"),
+      deployAmount: String(input.deployAmount || "0.5"),
       specification: input.specification || null,
       transactionPlans: Array.isArray(input.transactionPlans) ? input.transactionPlans : [],
       review: input.review || null,

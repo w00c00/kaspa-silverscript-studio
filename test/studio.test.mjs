@@ -290,7 +290,7 @@ test("a deterministic template can replace a local work without AI and clears st
     assert.equal(applied.id, project.id);
     assert.equal(applied.review.templateId, template.id);
     assert.equal(applied.source, template.source);
-    assert.equal(applied.deployAmount, "0.15");
+    assert.equal(applied.deployAmount, "0.5");
     assert.deepEqual(applied.templateParameters, parameters);
     assert.equal(applied.artifact, null);
     assert.equal(applied.deployment, null);
@@ -304,7 +304,7 @@ test("human template fields deterministically produce compile-ready constructor 
   for (const template of templates.list()) {
     const parameters = configuredTemplateParameters(template);
     const input = templates.projectInput(template.id, "tn10", parameters);
-    assert.equal(input.deployAmount, parameters.amountKas || "0.15");
+    assert.equal(input.deployAmount, parameters.amountKas || "0.5");
     if (template.id === "kcc721-experimental") {
       assert.equal(input.templateParameters.collectionMode, "preview");
       assert.equal(input.templateParameters.collectionId, null);
@@ -437,6 +437,12 @@ test("phrase-free local renewal requires the exact TN10 project, artifact, outpo
     }
   };
   assert.equal(assertLocalRenewalPackage(project, inspected), true);
+  const dynamicFee = structuredClone(inspected);
+  dynamicFee.review.feeSompi = "1460500";
+  assert.equal(assertLocalRenewalPackage(project, dynamicFee), true);
+  const excessiveFee = structuredClone(inspected);
+  excessiveFee.review.feeSompi = "2000001";
+  assert.throws(() => assertLocalRenewalPackage(project, excessiveFee), /0\.00001 to 0\.02 TKAS/i);
   const counterfeit = structuredClone(inspected);
   counterfeit.review.outputs[0].covenantId = "66".repeat(32);
   assert.throws(() => assertLocalRenewalPackage(project, counterfeit), /exactly one same-covenant/i);
@@ -587,7 +593,13 @@ test("mature inheritance builds a complete unsigned distribution that conserves 
     payload: ""
   }));
   const lookup = async () => ({ entry: holder.inputs[0].utxo, address: p2shAddress, covenantId });
-  const preflight = async () => ({ ok: true, verdict: "ready", stage: "draft" });
+  const preflight = async () => ({
+    ok: true,
+    verdict: "ready",
+    stage: "draft",
+    fee: { estimate_sompi: 1_740_100 },
+    masses: { compute: 15_401, storage: 61_632, transient: 10_724 }
+  });
 
   const built = await buildTemplateOperationPackage(
     { operationId: "inherit", feeKas: "0.01" },
@@ -601,15 +613,19 @@ test("mature inheritance builds a complete unsigned distribution that conserves 
   assert.equal(built.review.operation.kind, "inheritance-payment");
   assert.equal(built.review.complete, true);
   assert.deepEqual(built.review.signatureSlots, []);
-  assert.deepEqual(built.review.outputs.map((output) => output.valueSompi), ["29400000", "19600000"]);
+  assert.deepEqual(built.review.outputs.map((output) => output.valueSompi), ["28955940", "19303960"]);
   assert.deepEqual(
     built.review.outputs.map((output) => output.address),
     configured.templateParameters.inheritors.map((inheritor) => inheritor.address.toLowerCase())
   );
   assert.equal(
     built.review.outputs.reduce((total, output) => total + BigInt(output.valueSompi), 0n),
-    49_000_000n
+    48_259_900n
   );
+  assert.equal(built.fee.requestedSompi, "1000000");
+  assert.equal(built.fee.actualSompi, "1740100");
+  assert.equal(built.fee.automaticallyAdjusted, true);
+  assert.equal(JSON.parse(built.package.transactionSafeJson).storageMass, "61632");
   assert.equal(
     JSON.parse(built.package.transactionSafeJson).inputs[0].sequence,
     String(configured.constructorArgs[3].data)
@@ -1082,6 +1098,7 @@ test("TN10 Experimental KCC721 pack compiles all pinned contracts and blocks sta
     feeSompi: "1000000",
     provenance: { templateId: pack.id, operationId: "transfer" }
   });
+  assert.ok(JSON.parse(atomic.transactionSafeJson).inputs.every((input) => input.sigOpCount === 0));
   const p2pkSigner = {
     async signP2pkInput({ transactionSafeJson, inputIndex }) {
       const transaction = kaspa.Transaction.deserializeFromSafeJSON(transactionSafeJson);
@@ -1160,16 +1177,18 @@ test("every built-in template exposes a deterministic reverse operation package"
     const preflight = async (transactionSafeJson, network, stage) => {
       const transaction = JSON.parse(transactionSafeJson);
       assert.equal(transaction.inputs[0].computeBudget, 120, templateId);
+      assert.equal(transaction.inputs[0].sigOpCount, 0, `${templateId} must not carry a legacy v0 sig-op count in Toccata v1`);
       assert.equal(network, "tn10", templateId);
       assert.equal(stage, "draft", templateId);
-      return { ok: true, verdict: "ready", stage };
+      return { ok: true, verdict: "ready", stage, fee: { estimate_sompi: 1_000_000 } };
     };
     const built = await buildTemplateOperationPackage(operationInput, project, template, lookup, preflight);
     assert.equal(built.review.entrypoint, operationInput.operationId, templateId);
     assert.equal(built.review.covenantId, covenantId, templateId);
     const operations = templateOperations(project);
     assert.ok(operations.length >= 1, templateId);
-    assert.equal(built.review.feeSompi, "1000000", templateId);
+    assert.equal(built.review.feeSompi, templateId === "two-of-three" ? "1500000" : "1250000", templateId);
+    assert.equal(built.fee.signatureExecutionReserveSompi, templateId === "two-of-three" ? "500000" : "250000", templateId);
     assert.equal(built.preflight.verdict, "ready", templateId);
     if (templateId === "two-of-three") {
       assert.deepEqual(operations[0].availableSigners, [
@@ -1251,7 +1270,7 @@ test("deployment builder rejects source edited after compilation before network 
     constructorArgsSha256: crypto.createHash("sha256").update("[]").digest("hex")
   };
   await assert.rejects(
-    buildDeployDraft({ network: "tn10", address, publicKey, amountKas: "0.05", artifact, source: "edited source", constructorArgs: [] }, {}),
+    buildDeployDraft({ network: "tn10", address, publicKey, amountKas: "0.5", artifact, source: "edited source", constructorArgs: [] }, {}),
     /source changed after compilation/i
   );
 });
@@ -1267,9 +1286,67 @@ test("deployment builder rejects constructor arguments edited after compilation 
     constructorArgsSha256: crypto.createHash("sha256").update("[]").digest("hex")
   };
   await assert.rejects(
-    buildDeployDraft({ network: "tn10", address, publicKey, amountKas: "0.05", artifact, source: "compiled source", constructorArgs: [{ kind: "int", data: 1 }] }, {}),
+    buildDeployDraft({ network: "tn10", address, publicKey, amountKas: "0.5", artifact, source: "compiled source", constructorArgs: [{ kind: "int", data: 1 }] }, {}),
     /constructor arguments changed after compilation/i
   );
+});
+
+test("deployment builder enforces a standard-mass-safe covenant cell and accepts a large faucet UTXO", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "silverstudio-deploy-mass-test-"));
+  const originalFetch = globalThis.fetch;
+  const privateKey = new kaspa.PrivateKey("04".padStart(64, "0"));
+  const publicKey = privateKey.toPublicKey().toXOnlyPublicKey().toString();
+  const address = privateKey.toAddress("testnet-10").toString();
+  const script = kaspa.payToAddressScript(address).script;
+  const source = "compiled source";
+  const constructorArgs = [];
+  const programHex = "51";
+  const artifact = {
+    programHex,
+    programSha256: crypto.createHash("sha256").update(Buffer.from(programHex, "hex")).digest("hex"),
+    sourceSha256: crypto.createHash("sha256").update(source).digest("hex"),
+    constructorArgsSha256: crypto.createHash("sha256").update(JSON.stringify(constructorArgs)).digest("hex")
+  };
+  try {
+    await assert.rejects(
+      buildDeployDraft({ network: "tn10", address, publicKey, amountKas: "0.05", artifact, source, constructorArgs }, new DraftStore(directory)),
+      (error) => error.code === "COVENANT_AMOUNT_BELOW_STANDARD_MASS" && error.report?.minimumAmountKas === "0.5"
+    );
+    setRpcClientFactoryForTests(() => ({
+      async connect() {},
+      async disconnect() {},
+      async stop() {},
+      async getServerInfo() { return { networkId: "testnet-10" }; },
+      async getUtxosByAddresses() {
+        return { entries: [{
+          address,
+          outpoint: { transactionId: "44".repeat(32), index: 0 },
+          amount: 4000n * 100_000_000n,
+          scriptPublicKey: { script },
+          blockDaaScore: 0n,
+          isCoinbase: false
+        }] };
+      }
+    }));
+    globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, verdict: "ready", findings: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+    const draft = await buildDeployDraft(
+      { network: "tn10", address, publicKey, amountKas: "0.5", artifact, source, constructorArgs },
+      new DraftStore(directory)
+    );
+    const transaction = kaspa.Transaction.deserializeFromSafeJSON(draft.signing.txJsonString);
+    assert.equal(draft.amountSompi, "50000000");
+    assert.equal(transaction.outputs[0].value, 50_000_000n);
+    assert.ok(BigInt(transaction.storageMass) <= BigInt(kaspa.maximumStandardTransactionMass()));
+    try { transaction.free(); } catch {}
+  } finally {
+    setRpcClientFactoryForTests();
+    globalThis.fetch = originalFetch;
+    try { privateKey.free(); } catch {}
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("Kascov preflight adapter preserves WASM Safe JSON outpoints, scripts and genesis covenant identity", () => {
@@ -1458,6 +1535,9 @@ test("every built-in template fully compiles with its realistic default argument
   const templates = new TemplateStore().list();
   assert.ok(templates.length >= 4);
   for (const template of templates) {
+    const amount = template.parameters.find((field) => field.type === "amount");
+    assert.ok(!amount || Number(amount.default) >= 0.5, `${template.id} default covenant cell is below the standard-mass-safe minimum`);
+    assert.ok(!amount || Number(amount.minimum) >= 0.5, `${template.id} minimum covenant cell is below the standard-mass-safe minimum`);
     const artifact = await compileContract(template);
     assert.ok(artifact.programHex.length > 0, template.id);
     assert.equal(artifact.compiler.upstreamCommit, SILVERSCRIPT_COMMIT);
@@ -1487,7 +1567,7 @@ test("local wallet encrypts its mnemonic and signs without persisting secrets", 
     };
     const transaction = new kaspa.Transaction({
       version: 1,
-      inputs: [{ previousOutpoint: utxo.outpoint, signatureScript: "", sequence: 0n, sigOpCount: 1, utxo }],
+      inputs: [{ previousOutpoint: utxo.outpoint, signatureScript: "", sequence: 0n, sigOpCount: 0, computeBudget: 10, utxo }],
       outputs: [new kaspa.TransactionOutput(99_000_000n, kaspa.payToAddressScript(wallet.address))],
       lockTime: 0n,
       subnetworkId: "00".repeat(20),

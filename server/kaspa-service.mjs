@@ -8,7 +8,10 @@ import { CovenantStateSource, covenantStateProvider } from "./covenant-state-sou
 const require = createRequire(import.meta.url);
 const kaspa = require("@kluster/kaspa-wasm");
 const SOMPI = 100_000_000n;
-const MIN_DEPLOY_SOMPI = 5_000_000n;
+// A 0.5 KAS covenant cell stays below the bundled wallet calculator's
+// conservative 100,000-mass ceiling even when it is funded from a large
+// faucet/mining UTXO. This is a Studio safety floor, not a consensus dust rule.
+const MIN_DEPLOY_SOMPI = 50_000_000n;
 const DEFAULT_FEE_RESERVE = 2_000_000n;
 
 function networkOf(id) {
@@ -505,7 +508,13 @@ export async function buildDeployDraft(input, draftStore) {
   const publicKey = String(input.publicKey || "").trim();
   assertAddressAndPublicKey(address, publicKey, network);
   const amount = kasToSompi(input.amountKas);
-  if (amount < MIN_DEPLOY_SOMPI) throw new Error("Covenant deployment requires at least 0.05 KAS/TKAS for standard mass headroom");
+  if (amount < MIN_DEPLOY_SOMPI) {
+    throw Object.assign(new Error("Studio requires at least 0.5 KAS/TKAS for conservative covenant storage-mass headroom"), {
+      status: 400,
+      code: "COVENANT_AMOUNT_BELOW_STANDARD_MASS",
+      report: { minimumAmountSompi: MIN_DEPLOY_SOMPI.toString(), minimumAmountKas: sompiToKas(MIN_DEPLOY_SOMPI) }
+    });
+  }
   if (network.id === "mainnet" && amount > kasToSompi(config.mainnetMaxDeployKas)) throw new Error(`Mainnet deployment exceeds the ${config.mainnetMaxDeployKas} KAS local cap`);
   const programHex = assertProgramHex(input.artifact?.programHex);
   if (Array.isArray(input.artifact?.deploymentBlockedReasons) && input.artifact.deploymentBlockedReasons.length) {
@@ -525,38 +534,60 @@ export async function buildDeployDraft(input, draftStore) {
   }
   const utxos = await fetchSpendableUtxos(network, address);
   const required = amount + DEFAULT_FEE_RESERVE;
-  const utxo = utxos.find((item) => item.amount >= required);
-  if (!utxo) throw new Error(`No plain spendable UTXO contains at least ${Number(required) / Number(SOMPI)} ${network.symbol}`);
+  const candidates = utxos.filter((item) => item.amount >= required).sort((a, b) => a.amount < b.amount ? -1 : a.amount > b.amount ? 1 : 0);
+  if (!candidates.length) throw new Error(`No plain spendable UTXO contains at least ${Number(required) / Number(SOMPI)} ${network.symbol}`);
 
-  const inputValue = {
-    previousOutpoint: utxo.outpoint,
-    signatureScript: "",
-    sequence: 0n,
-    sigOpCount: 0,
-    computeBudget: 120,
-    utxo: {
-      address,
-      outpoint: utxo.outpoint,
-      amount: utxo.amount,
-      scriptPublicKey: new kaspa.ScriptPublicKey(0, utxo.script),
-      blockDaaScore: utxo.blockDaaScore,
-      isCoinbase: false
+  let transaction = null;
+  let lowestMass = null;
+  for (const utxo of candidates) {
+    const inputValue = {
+      previousOutpoint: utxo.outpoint,
+      signatureScript: "",
+      sequence: 0n,
+      sigOpCount: 0,
+      computeBudget: 120,
+      utxo: {
+        address,
+        outpoint: utxo.outpoint,
+        amount: utxo.amount,
+        scriptPublicKey: new kaspa.ScriptPublicKey(0, utxo.script),
+        blockDaaScore: utxo.blockDaaScore,
+        isCoinbase: false
+      }
+    };
+    const outputs = [new kaspa.TransactionOutput(amount, kaspa.payToScriptHashScript(programHex))];
+    const change = utxo.amount - required;
+    if (change > 0n) outputs.push(new kaspa.TransactionOutput(change, kaspa.payToAddressScript(address)));
+    const candidate = new kaspa.Transaction({
+      version: 1,
+      inputs: [inputValue],
+      outputs,
+      lockTime: 0n,
+      subnetworkId: "0000000000000000000000000000000000000000",
+      gas: 0n,
+      payload: ""
+    });
+    candidate.populateGenesisCovenants([{ authorizingInput: 0, outputs: [0] }]);
+    const mass = BigInt(kaspa.calculateTransactionMass(network.kaspaNetworkId, candidate, 1, true));
+    if (lowestMass === null || mass < lowestMass) lowestMass = mass;
+    if (kaspa.updateTransactionMass(network.kaspaNetworkId, candidate, 1, true)) {
+      transaction = candidate;
+      break;
     }
-  };
-  const outputs = [new kaspa.TransactionOutput(amount, kaspa.payToScriptHashScript(programHex))];
-  const change = utxo.amount - required;
-  if (change > 0n) outputs.push(new kaspa.TransactionOutput(change, kaspa.payToAddressScript(address)));
-  const transaction = new kaspa.Transaction({
-    version: 1,
-    inputs: [inputValue],
-    outputs,
-    lockTime: 0n,
-    subnetworkId: "0000000000000000000000000000000000000000",
-    gas: 0n,
-    payload: ""
-  });
-  transaction.populateGenesisCovenants([{ authorizingInput: 0, outputs: [0] }]);
-  if (!kaspa.updateTransactionMass(network.kaspaNetworkId, transaction, 1, true)) throw new Error("Transaction exceeds the standard mass limit");
+    try { candidate.free?.(); } catch {}
+  }
+  if (!transaction) {
+    const maximumMass = BigInt(kaspa.maximumStandardTransactionMass());
+    throw Object.assign(new Error(`No available UTXO can fund this covenant within the standard mass limit (${lowestMass ?? "unknown"}/${maximumMass})`), {
+      status: 400,
+      code: "COVENANT_DEPLOYMENT_MASS_LIMIT",
+      report: {
+        calculatedMass: lowestMass?.toString() || "",
+        maximumStandardMass: maximumMass.toString(),
+        minimumAmountKas: sompiToKas(MIN_DEPLOY_SOMPI)
+      }
+    });
+  }
   const unsignedTransactionSafeJson = transaction.serializeToSafeJSON();
   const safe = JSON.parse(unsignedTransactionSafeJson);
   const covenantId = String(safe.outputs?.[0]?.covenant?.covenantId || "");

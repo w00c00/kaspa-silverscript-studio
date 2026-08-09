@@ -13,7 +13,7 @@
   "sourceFile": "contract.sil",
   "requiredReplacements": [0, 1, 2, 3, 4, 5],
   "parameters": [
-    { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.05", "minimum": "0.05", "labelZh": "领取资金", "labelEn": "Claim value", "helpZh": "扣除显式矿工费后的余额一次性支付给领取人。", "helpEn": "The full balance minus the explicit miner fee is paid once to the claimant." },
+    { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.5", "minimum": "0.5", "labelZh": "领取资金", "labelEn": "Claim value", "helpZh": "至少 0.5 TKAS/KAS；扣除显式矿工费后的余额一次性支付给领取人。", "helpEn": "At least 0.5 TKAS/KAS; the full balance minus the explicit miner fee is paid once to the claimant." },
     { "id": "claimantAddress", "type": "address", "argIndex": 0, "required": true, "labelZh": "领取钱包", "labelEn": "Claimant wallet", "placeholderZh": "kaspatest:...", "placeholderEn": "kaspatest:...", "helpZh": "Merkle 叶子和链上签名同时绑定该钱包。", "helpEn": "Both the Merkle leaf and on-chain signature bind this wallet." },
     { "id": "refundAddress", "type": "address", "argIndex": 1, "required": true, "labelZh": "超时退款钱包", "labelEn": "Timeout refund wallet", "placeholderZh": "kaspatest:...", "placeholderEn": "kaspatest:...", "helpZh": "到期后只有该钱包能退款。", "helpEn": "Only this wallet can refund after timeout." },
     { "id": "merkleRoot", "type": "sha256", "argIndex": 2, "required": true, "labelZh": "Merkle Root", "labelEn": "Merkle root", "helpZh": "叶子为 SHA256(claimantPubkey || claimId || salt32)。", "helpEn": "Leaf is SHA256(claimantPubkey || claimId || salt32)." },

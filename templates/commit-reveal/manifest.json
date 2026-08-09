@@ -13,7 +13,7 @@
   "sourceFile": "contract.sil",
   "requiredReplacements": [0, 1, 2, 3, 4],
   "parameters": [
-    { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.05", "minimum": "0.05", "labelZh": "托管金额", "labelEn": "Escrow value", "helpZh": "Reveal 或退款时扣除显式矿工费后全额支付。", "helpEn": "Reveal or refund pays the full balance minus the explicit miner fee." },
+    { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.5", "minimum": "0.5", "labelZh": "托管金额", "labelEn": "Escrow value", "helpZh": "至少 0.5 TKAS/KAS；Reveal 或退款时扣除显式矿工费后全额支付。", "helpEn": "At least 0.5 TKAS/KAS; reveal or refund pays the full balance minus the explicit miner fee." },
     { "id": "senderAddress", "type": "address", "argIndex": 0, "required": true, "labelZh": "发送方／退款钱包", "labelEn": "Sender / refund wallet", "placeholderZh": "kaspatest:...", "placeholderEn": "kaspatest:...", "helpZh": "到期后用该钱包签名退款。", "helpEn": "This wallet signs the timeout refund." },
     { "id": "recipientAddress", "type": "address", "argIndex": 1, "required": true, "labelZh": "Reveal 收款钱包", "labelEn": "Reveal recipient wallet", "placeholderZh": "kaspatest:...", "placeholderEn": "kaspatest:...", "helpZh": "只有该钱包签名并提供正确 payload 与 salt 才能领取。", "helpEn": "Only this wallet can claim with the correct payload and salt." },
     { "id": "domain", "type": "sha256", "argIndex": 2, "required": true, "labelZh": "协议域", "labelEn": "Protocol domain", "helpZh": "32 字节协议标识，防止承诺跨应用重放。", "helpEn": "A 32-byte protocol identifier preventing cross-application replay." },

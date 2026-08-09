@@ -2,12 +2,17 @@ import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { NETWORKS } from "./config.mjs";
 import { finalizeExternalCovenantPackage, inspectExternalCovenantPackage } from "./external-covenant-service.mjs";
-import { findCovenantUtxo, kasToSompi, kascovPreflight } from "./kaspa-service.mjs";
+import { findCovenantUtxo, kasToSompi, kascovPreflight, sompiToKas } from "./kaspa-service.mjs";
 
 const require = createRequire(import.meta.url);
 const kaspa = require("@kluster/kaspa-wasm");
 const MAX_OPERATION_FEE = 10_000_000n;
 const OPERATION_COMPUTE_BUDGET = 120;
+// Draft preflight uses zero-filled signature slots. A real CheckSig adds about
+// 2,495 compute grams with the pinned engine, or 249,500 sompi at the current
+// relay rate. Round upward so the package is fully funded before any signer is
+// asked to approve it.
+const SIGNATURE_EXECUTION_FEE_RESERVE = 250_000n;
 
 const OPERATIONS = {
   "owner-vault": [
@@ -153,7 +158,8 @@ export async function buildTemplateOperationPackage(
   project,
   template,
   findUtxo = findCovenantUtxo,
-  preflight = kascovPreflight
+  preflight = kascovPreflight,
+  feeContext = null
 ) {
   const templateId = templateIdOf(project);
   const operation = exactOperation(templateId, String(input.operationId || ""));
@@ -161,15 +167,16 @@ export async function buildTemplateOperationPackage(
   if (project.deployment.network !== project.network) throw operationError("Project deployment network does not match the project");
   const network = NETWORKS[project.network];
   if (!network) throw operationError("Project network is unsupported");
-  const source = await findUtxo(
-    project.network,
-    project.artifact.programHex,
-    project.deployment.activeTxid || project.deployment.txid,
-    project.deployment.activeOutputIndex ?? 0,
-    project.deployment.covenantId || ""
-  );
+  const source = feeContext?.source || await findUtxo(
+      project.network,
+      project.artifact.programHex,
+      project.deployment.activeTxid || project.deployment.txid,
+      project.deployment.activeOutputIndex ?? 0,
+      project.deployment.covenantId || ""
+    );
   if (project.deployment.covenantId && project.deployment.covenantId !== source.covenantId) throw operationError("Stored deployment covenant ID does not match the unspent output");
-  const fee = kasToSompi(String(input.feeKas || "0.01"));
+  const requestedFee = feeContext?.requestedFee ?? kasToSompi(String(input.feeKas || "0.01"));
+  const fee = feeContext?.fee ?? requestedFee;
   if (fee < 1000n || fee > MAX_OPERATION_FEE) throw operationError("Operation fee must be from 0.00001 to 0.1 KAS/TKAS");
   const inputValue = BigInt(source.entry.amount);
   if (inputValue <= fee) throw operationError("Covenant value is not enough to pay the selected fee");
@@ -275,7 +282,8 @@ export async function buildTemplateOperationPackage(
       previousOutpoint: source.entry.outpoint,
       signatureScript: "",
       sequence,
-      sigOpCount: sigOps,
+      // Toccata v1 commits a compute budget, not the legacy v0 sig-op field.
+      sigOpCount: 0,
       computeBudget: OPERATION_COMPUTE_BUDGET,
       utxo: source.entry
     }],
@@ -285,7 +293,6 @@ export async function buildTemplateOperationPackage(
     gas: 0n,
     payload: ""
   });
-  if (!kaspa.updateTransactionMass(network.kaspaNetworkId, transaction, Math.max(sigOps, 1), true)) throw operationError("Operation transaction exceeds the standard mass limit");
   const packageValue = {
     version: 1,
     network: project.network,
@@ -308,7 +315,101 @@ export async function buildTemplateOperationPackage(
       sourceSha256: project.artifact.sourceSha256 || ""
     }
   };
-  const prepared = sigOps === 0 ? finalizeExternalCovenantPackage(packageValue) : inspectExternalCovenantPackage(packageValue);
-  const preflightReport = await preflight(prepared.package.transactionSafeJson, project.network, "draft");
-  return { operation, ...prepared, preflight: preflightReport };
+  let prepared = sigOps === 0 ? finalizeExternalCovenantPackage(packageValue) : inspectExternalCovenantPackage(packageValue);
+
+  // The redeem program and covenant arguments are added to signatureScript only
+  // when an operation package is finalized. Estimating before that point
+  // underprices large contracts. Fill temporary signature slots, assemble the
+  // exact script, and then calculate the network minimum fee and mass.
+  let estimation = prepared;
+  if (!prepared.review.complete) {
+    const estimatePackage = structuredClone(prepared.package);
+    for (const covenantInput of estimatePackage.covenantInputs || []) {
+      covenantInput.arguments = (covenantInput.arguments || []).map((argument) => argument?.kind === "signature" && !argument.hex
+        ? { ...argument, hex: "00".repeat(65) }
+        : argument);
+    }
+    if (estimatePackage.covenantInputs?.length === 1) estimatePackage.covenantInput = estimatePackage.covenantInputs[0];
+    estimation = finalizeExternalCovenantPackage(estimatePackage);
+  }
+  const estimatedTransaction = kaspa.Transaction.deserializeFromSafeJSON(estimation.package.transactionSafeJson);
+  const minimumSignatures = Math.max(sigOps, 1);
+  const calculatedMass = BigInt(kaspa.calculateTransactionMass(network.kaspaNetworkId, estimatedTransaction, minimumSignatures, true));
+  const maximumMass = BigInt(kaspa.maximumStandardTransactionMass());
+  const minimumFee = kaspa.calculateTransactionFee(network.kaspaNetworkId, estimatedTransaction, minimumSignatures, true);
+  try { estimatedTransaction.free?.(); } catch {}
+  if (calculatedMass > maximumMass || minimumFee === undefined) {
+    throw operationError(`Operation transaction exceeds the standard mass limit (${calculatedMass}/${maximumMass})`, "OPERATION_MASS_LIMIT");
+  }
+  const requiredFee = BigInt(minimumFee);
+  if (fee < requiredFee) {
+    const pass = Number(feeContext?.pass || 0);
+    if (pass >= 3 || requiredFee > MAX_OPERATION_FEE) {
+      throw operationError(`Operation requires at least ${sompiToKas(requiredFee)} KAS/TKAS in fees`, "OPERATION_FEE_TOO_LOW");
+    }
+    return buildTemplateOperationPackage(input, project, template, async () => source, preflight, {
+      source,
+      requestedFee,
+      fee: requiredFee,
+      pass: pass + 1
+    });
+  }
+
+  const unsignedTransaction = kaspa.Transaction.deserializeFromSafeJSON(packageValue.transactionSafeJson);
+  unsignedTransaction.storageMass = calculatedMass;
+  unsignedTransaction.finalize();
+  packageValue.transactionSafeJson = unsignedTransaction.serializeToSafeJSON();
+  try { unsignedTransaction.free?.(); } catch {}
+  prepared = sigOps === 0 ? finalizeExternalCovenantPackage(packageValue) : inspectExternalCovenantPackage(packageValue);
+  let preflightReport = await preflight(prepared.package.transactionSafeJson, project.network, "draft");
+  let engineMinimumFee = 0n;
+  try { engineMinimumFee = BigInt(preflightReport?.fee?.estimate_sompi || 0); } catch {}
+  const signatureExecutionReserve = BigInt(sigOps) * SIGNATURE_EXECUTION_FEE_RESERVE;
+  const engineRequiredFee = engineMinimumFee + signatureExecutionReserve;
+  if (engineRequiredFee > fee) {
+    const pass = Number(feeContext?.pass || 0);
+    if (pass >= 3 || engineRequiredFee > MAX_OPERATION_FEE) {
+      throw operationError(`Operation requires at least ${sompiToKas(engineRequiredFee)} KAS/TKAS in fees`, "OPERATION_FEE_TOO_LOW");
+    }
+    return buildTemplateOperationPackage(input, project, template, async () => source, preflight, {
+      source,
+      requestedFee,
+      fee: engineRequiredFee,
+      pass: pass + 1
+    });
+  }
+
+  const engineMasses = preflightReport?.masses || {};
+  const authoritativeMass = [engineMasses.compute, engineMasses.storage, engineMasses.transient]
+    .map((value) => Number(value || 0))
+    .filter((value) => Number.isSafeInteger(value) && value > 0)
+    .reduce((maximum, value) => Math.max(maximum, value), 0);
+  if (authoritativeMass > 0) {
+    const finalTransaction = kaspa.Transaction.deserializeFromSafeJSON(prepared.package.transactionSafeJson);
+    if (BigInt(finalTransaction.storageMass) !== BigInt(authoritativeMass)) {
+      finalTransaction.storageMass = BigInt(authoritativeMass);
+      finalTransaction.finalize();
+      prepared.package.transactionSafeJson = finalTransaction.serializeToSafeJSON();
+      prepared = inspectExternalCovenantPackage(prepared.package);
+      preflightReport = await preflight(prepared.package.transactionSafeJson, project.network, "draft");
+    }
+    try { finalTransaction.free?.(); } catch {}
+  }
+  return {
+    operation,
+    ...prepared,
+    preflight: preflightReport,
+    fee: {
+      requestedSompi: requestedFee.toString(),
+      requestedKas: sompiToKas(requestedFee),
+      actualSompi: fee.toString(),
+      actualKas: sompiToKas(fee),
+      automaticallyAdjusted: fee > requestedFee,
+      calculatedMass: calculatedMass.toString(),
+      maximumStandardMass: maximumMass.toString(),
+      engineMinimumFeeSompi: engineMinimumFee.toString(),
+      signatureExecutionReserveSompi: signatureExecutionReserve.toString(),
+      engineMasses
+    }
+  };
 }

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.7 — 2026-08-09
+
+- Raised Studio's conservative covenant-cell default and minimum to 0.5 KAS/TKAS, preventing storage-mass rejection when funding a small covenant from a large faucet or mining UTXO.
+- Made genesis deployment choose the lowest suitable UTXO, calculate the exact candidate mass, and return structured diagnostics before signing when no candidate is standard.
+- Fixed Toccata v1 covenant and P2PK co-spend inputs to commit only `computeBudget`; non-zero legacy `sigOpCount` fields are now excluded because current nodes reject that mixed encoding.
+- Moved lifecycle fee calculation after full redeem-program and argument assembly, consumes the pinned script engine's fee/mass report, and reserves the final CheckSig execution cost before collecting signatures.
+- Kept phrase-free TN10 inheritance renewal fail-closed: only the exact current same-covenant continuation is accepted, with a dynamic fee capped at 0.02 TKAS.
+- Added regression coverage for large-faucet-UTXO deployment, engine-driven fee adjustment, signed execution reserve, Toccata v1 input encoding, and the renewal fee safety cap.
+- Completed live TN10 end-to-end verification for wallet transfer, covenant genesis, mature multi-inheritor distribution, and owner-signed check-in continuation; all final transactions passed the bundled engine and Kascov before node acceptance.
+
+## 0.2.7 — 2026-08-09（中文）
+
+- Studio 的保守 Covenant Cell 默认值与最低值统一提高到 0.5 KAS/TKAS，避免从水龙头或挖矿大额 UTXO 拆出过小契约输出时被存储质量规则拒绝。
+- 部署构建器会优先选择金额最小的合适 UTXO、逐笔计算真实质量；若没有标准交易候选，会在签名前返回结构化诊断。
+- 修复 Toccata v1 契约输入与 P2PK 共同授权输入：只提交 `computeBudget`，不再混入当前节点会拒绝的旧版非零 `sigOpCount`。
+- 生命周期手续费改为在 redeem program 与全部参数完整装配后计算，读取固定脚本引擎的费用／质量报告，并在收集签名前预留真实 CheckSig 执行费用。
+- TN10 免短语继承签到继续保持失效关闭：只允许当前项目、当前 UTXO、同 covenant ID 的唯一延续输出，动态手续费上限为 0.02 TKAS。
+- 增加大额水龙头 UTXO 部署、引擎动态费率、签名执行预留、Toccata v1 字段编码及续期费用上限的回归测试。
+- 已在真实 TN10 完成钱包转账、契约创世、多继承人成熟分配、拥有者签名签到延续的端到端验证；最终交易均先通过内置引擎和 Kascov，再由节点接受。
+
 ## 0.2.6 — 2026-08-09
 
 - Updated the default SHA-256-pinned official SilverScript compiler to `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`; the `2a3961c` legacy profile remains available for reproducibility.
