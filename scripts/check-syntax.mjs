@@ -15,6 +15,10 @@ for (const directory of ["server", "src", "scripts"]) {
 }
 for (const file of files) execFileSync(process.execPath, ["--check", file], { stdio: "inherit" });
 const preflightManifest = JSON.parse(fs.readFileSync(path.join(root, "config", "kascov-preflight.json"), "utf8"));
+if (preflightManifest.sourceMode !== "vendored-mit-snapshot") throw new Error("Local preflight must use the vendored source snapshot");
+for (const requiredPath of [preflightManifest.sourceModule, preflightManifest.license, "vendor/kascov-preflight/Cargo.lock"]) {
+  if (!requiredPath || !fs.existsSync(path.join(root, requiredPath))) throw new Error(`Vendored preflight source is incomplete: ${requiredPath || "missing manifest path"}`);
+}
 const preflightLocalManifestFile = path.join(root, "config", "kascov-preflight.local.json");
 if (!fs.existsSync(preflightLocalManifestFile)) throw new Error("Local preflight manifest is missing. Run npm run setup:kascov-preflight.");
 const preflightLocalManifest = JSON.parse(fs.readFileSync(preflightLocalManifestFile, "utf8"));

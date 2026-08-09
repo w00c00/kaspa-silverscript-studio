@@ -9,6 +9,7 @@
 - Kept phrase-free TN10 inheritance renewal fail-closed: only the exact current same-covenant continuation is accepted, with a dynamic fee capped at 0.02 TKAS.
 - Added regression coverage for large-faucet-UTXO deployment, engine-driven fee adjustment, signed execution reserve, Toccata v1 input encoding, and the renewal fee safety cap.
 - Completed live TN10 end-to-end verification for wallet transfer, covenant genesis, mature multi-inheritor distribution, and owner-signed check-in continuation; all final transactions passed the bundled engine and Kascov before node acceptance.
+- Vendored the audited MIT-licensed Kascov preflight source snapshot and its lockfile after the upstream repository removed the pinned commit; clean macOS, Windows, and Linux builds no longer depend on that upstream source remaining online. The lockfile also applies minimal fixes for `RUSTSEC-2026-0204` and `RUSTSEC-2026-0220`.
 
 ## 0.2.7 — 2026-08-09（中文）
 
@@ -19,6 +20,7 @@
 - TN10 免短语继承签到继续保持失效关闭：只允许当前项目、当前 UTXO、同 covenant ID 的唯一延续输出，动态手续费上限为 0.02 TKAS。
 - 增加大额水龙头 UTXO 部署、引擎动态费率、签名执行预留、Toccata v1 字段编码及续期费用上限的回归测试。
 - 已在真实 TN10 完成钱包转账、契约创世、多继承人成熟分配、拥有者签名签到延续的端到端验证；最终交易均先通过内置引擎和 Kascov，再由节点接受。
+- 在上游仓库删除原固定提交后，将已审计的 MIT 许可 Kascov 预检源码快照与锁文件直接纳入仓库；macOS、Windows、Linux 的干净构建不再依赖该上游源码持续在线，并以最小升级修复 `RUSTSEC-2026-0204` 与 `RUSTSEC-2026-0220`。
 
 ## 0.2.6 — 2026-08-09
 

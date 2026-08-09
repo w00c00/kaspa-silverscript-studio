@@ -92,6 +92,8 @@ npm ci
 
 首次运行需要在当前系统构建固定版本的两个原生工具。以下命令由 Node.js 驱动，可直接用于 macOS、Windows 和 Linux：
 
+Kascov 预检引擎使用仓库内置的 MIT 许可源码快照和 Cargo 锁文件构建，不依赖 Kascov 网站或其历史 Git 提交继续在线。
+
 ```bash
 npm run setup:silverc
 npm run setup:kascov-preflight
@@ -337,6 +339,8 @@ npm ci
 ```
 
 Build the two pinned native tools for the current platform. These Node.js-driven commands run directly on macOS, Windows, and Linux:
+
+The Kascov preflight helper builds from the committed MIT-licensed source snapshot and Cargo lockfile, so it does not depend on the Kascov website or a historical upstream Git commit remaining online.
 
 ```bash
 npm run setup:silverc

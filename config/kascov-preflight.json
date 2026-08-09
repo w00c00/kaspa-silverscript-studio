@@ -2,7 +2,9 @@
   "repository": "https://github.com/Knitser/kascov.git",
   "upstreamCommit": "b64d6b4114df324f899783080371f26b619b19d0",
   "rustyKaspaCommit": "98a4ccd8d200853787f227bd4536ac540cf34957",
-  "sourceModule": "crates/kascov/src/preflight.rs",
+  "sourceMode": "vendored-mit-snapshot",
+  "sourceModule": "vendor/kascov-preflight/crates/studio-kascov-preflight/src/preflight.rs",
+  "license": "vendor/kascov-preflight/LICENSE",
   "binary": "bin/kascov-preflight",
   "purpose": "Offline transaction preflight using the same Kaspa script engine path as Kascov"
 }

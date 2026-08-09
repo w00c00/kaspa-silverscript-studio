@@ -156,6 +156,22 @@ test("desktop helpers use native executable names on Windows and Unix", () => {
   assert.match(rustLauncher, /cfg!\(windows\)/);
 });
 
+test("local preflight builds from the committed MIT source snapshot", () => {
+  const buildScript = fs.readFileSync(new URL("../scripts/build-kascov-preflight.mjs", import.meta.url), "utf8");
+  const provenance = JSON.parse(fs.readFileSync(new URL("../config/kascov-preflight.json", import.meta.url), "utf8"));
+  assert.equal(provenance.sourceMode, "vendored-mit-snapshot");
+  assert.match(buildScript, /vendor[^\n]+kascov-preflight/);
+  assert.doesNotMatch(buildScript, /KASCOV_REPOSITORY|KASCOV_COMMIT|git[^\n]+(?:clone|fetch)/);
+  for (const requiredPath of [
+    "../vendor/kascov-preflight/Cargo.toml",
+    "../vendor/kascov-preflight/Cargo.lock",
+    "../vendor/kascov-preflight/LICENSE",
+    "../vendor/kascov-preflight/crates/studio-kascov-preflight/src/preflight.rs"
+  ]) {
+    assert.equal(fs.existsSync(new URL(requiredPath, import.meta.url)), true, `${requiredPath} must be committed`);
+  }
+});
+
 test("AI package retains explicit transaction plans and stays experimental", () => {
   const parsed = parseAiContract(JSON.stringify({
     specification: { title: "Counter" },

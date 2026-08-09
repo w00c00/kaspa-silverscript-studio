@@ -6,6 +6,7 @@ dist/
 data/
 bin/
 release/
+vendor/kascov-preflight/target/
 config/compiler.json
 config/kascov-preflight.local.json
 *.log
