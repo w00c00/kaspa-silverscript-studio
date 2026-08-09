@@ -7,7 +7,7 @@
   "descriptionEn": "Deployment fixes a domain and commitment; the recipient reveals payload and salt to claim, or the sender refunds after timeout. TN10 experimental only.",
   "experimentalOnly": true,
   "networkAllowlist": ["tn10"],
-  "compilerProfileId": "latest-4b0e1cd",
+  "compilerProfileId": "latest-cb34aa5",
   "requirementsEn": "Release a whole escrow only when a domain-separated payload commitment is revealed, with an authenticated timeout refund.",
   "risk": "experimental",
   "sourceFile": "contract.sil",

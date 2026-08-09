@@ -35,7 +35,7 @@ AI 只负责生成候选方案和辅助审查，不能解锁钱包、签名交�
 - 中英文界面；首次启动自动读取系统语言，并在系统语言既非中文也非英文时使用时区辅助判断。
 - 用户手动切换语言后，本机选择优先于自动识别。
 - 本地项目工作区，可创建、切换和删除未使用的工作。
-- 双编译器兼容档案：默认固定 `kaspanet/silverscript@4b0e1cd69739934f92c3ac4df1bb13d912418b2b`，并保留 `2a3961c` 旧版用于复现；两者都校验二进制 SHA-256。
+- 双编译器兼容档案：默认固定 `kaspanet/silverscript@cb34aa5e6a598f9e461c4ad7014279ba89251d8d`，并保留 `2a3961c` 旧版用于复现；两者都校验二进制 SHA-256。
 - 内置破坏性变更扫描与安全迁移，识别 `entry`、`checkMsgSig`、`outpointTxId`、artifact `bytecode` 等升级差异；无法安全自动迁移的 `.reverse()` 和位运算会要求人工审查。
 - 固定 Kascov 来源提交构建的本地交易预检引擎。
 - 支持 OpenAI、Anthropic、Gemini、OpenRouter、Ollama 和 OpenAI-compatible 接口。
@@ -149,7 +149,7 @@ npm run desktop:build
 - 固定版本本地预检引擎。
 - Kaspa WASM、契约模板、知识库和第三方许可证。
 
-原生安装包必须在对应系统上构建和测试，macOS、Windows 和 Linux 的二进制不能互相替代。v0.2.5 发布流程在原生 GitHub Runner 上分别生成 macOS Apple Silicon DMG、Windows x64 NSIS/MSI，以及 Linux x86_64 DEB/AppImage，并附带 SHA-256 校验文件。macOS 包必须使用已签名 sidecar 通过 V8、健康接口和模板接口测试；Windows 包必须通过安装资源启动、健康接口和模板接口测试。
+原生安装包必须在对应系统上构建和测试，macOS、Windows 和 Linux 的二进制不能互相替代。发布流程在原生 GitHub Runner 上分别生成 macOS Apple Silicon DMG、Windows x64 NSIS/MSI，以及 Linux x86_64 DEB/AppImage，并附带 SHA-256 校验文件。macOS 包必须使用已签名 sidecar 通过 V8、健康接口和模板接口测试；Windows 包必须通过安装资源启动、健康接口和模板接口测试。
 
 公开包目前没有商业代码签名：macOS 使用 ad-hoc 签名且未公证，Windows 未进行 Authenticode 签名，Linux 未进行发行版签名。首次启动可能出现系统安全提示；请只从本仓库 Release 下载并核对 SHA-256。
 
@@ -288,7 +288,7 @@ AI is limited to candidate generation and review assistance. It cannot unlock wa
 - Chinese and English UI with automatic system-language detection and time-zone fallback.
 - A manual language choice always overrides future automatic detection.
 - Local project workspace with explicit create, switch, and delete actions.
-- Dual compiler profiles: the default is pinned to `kaspanet/silverscript@4b0e1cd69739934f92c3ac4df1bb13d912418b2b`, while `2a3961c` remains available for reproducible legacy builds; both binaries are SHA-256 verified.
+- Dual compiler profiles: the default is pinned to `kaspanet/silverscript@cb34aa5e6a598f9e461c4ad7014279ba89251d8d`, while `2a3961c` remains available for reproducible legacy builds; both binaries are SHA-256 verified.
 - Built-in breaking-change detection and safe migration for `entry`, `checkMsgSig`, `outpointTxId`, and artifact `bytecode`; removed `.reverse()` and bitwise typing changes require manual review.
 - Pinned Kascov-derived local transaction preflight engine.
 - OpenAI, Anthropic, Gemini, OpenRouter, Ollama, and OpenAI-compatible providers.
@@ -375,7 +375,7 @@ npm run desktop:build
 
 The desktop bundle contains the frontend, local Node.js sidecar, pinned `silverc`, pinned local preflight engine, Kaspa WASM, templates, knowledge resources, and third-party license notices.
 
-Native installers must be built and tested on their target operating systems; macOS, Windows, and Linux binaries are not interchangeable. The v0.2.5 release pipeline produces a macOS Apple Silicon DMG, Windows x64 NSIS/MSI packages, and Linux x86_64 DEB/AppImage packages on native GitHub Runners, with SHA-256 checksum files. The macOS package must pass signed-sidecar V8, health-endpoint, and template-endpoint tests; the Windows package must pass packaged-resource startup, health-endpoint, and template-endpoint tests.
+Native installers must be built and tested on their target operating systems; macOS, Windows, and Linux binaries are not interchangeable. The release pipeline produces a macOS Apple Silicon DMG, Windows x64 NSIS/MSI packages, and Linux x86_64 DEB/AppImage packages on native GitHub Runners, with SHA-256 checksum files. The macOS package must pass signed-sidecar V8, health-endpoint, and template-endpoint tests; the Windows package must pass packaged-resource startup, health-endpoint, and template-endpoint tests.
 
 The public packages are not commercially code-signed: macOS is ad-hoc signed and not notarized, Windows is not Authenticode-signed, and Linux is not distribution-signed. The operating system may show a warning on first launch. Download only from this repository's Releases and verify the SHA-256 checksum.
 

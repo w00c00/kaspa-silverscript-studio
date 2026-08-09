@@ -4,7 +4,7 @@
 
 ### 编译器兼容档案
 
-`config/compiler-profiles.json` 是可提交的兼容性清单，`config/compiler.json` 是本机生成的二进制路径、构建时间和 SHA-256 清单。默认档案固定官方 SilverScript `4b0e1cd69739934f92c3ac4df1bb13d912418b2b`，旧版 `2a3961cadc76bb16a425042172ffe32481da89b5` 只用于复现已有项目。
+`config/compiler-profiles.json` 是可提交的兼容性清单，`config/compiler.json` 是本机生成的二进制路径、构建时间和 SHA-256 清单。默认档案固定官方 SilverScript `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`，旧版 `2a3961cadc76bb16a425042172ffe32481da89b5` 只用于复现已有项目。
 
 升级检查会报告已知变化，并只自动替换无歧义的名称。`.reverse()` 删除、字节序、位运算类型和任何状态布局变化必须人工审查。迁移后仍必须使用真实构造参数完整编译并进行对抗性交易测试。
 
@@ -48,7 +48,7 @@ Studio 当前依次尝试：节点原生 Covenant ID 查询（节点支持时）
 
 ### Compiler compatibility profiles
 
-`config/compiler-profiles.json` is the committed compatibility catalog. The generated `config/compiler.json` records local binary paths, build times, and SHA-256 hashes. The default profile pins official SilverScript commit `4b0e1cd69739934f92c3ac4df1bb13d912418b2b`; `2a3961cadc76bb16a425042172ffe32481da89b5` is retained only for reproducible legacy builds.
+`config/compiler-profiles.json` is the committed compatibility catalog. The generated `config/compiler.json` records local binary paths, build times, and SHA-256 hashes. The default profile pins official SilverScript commit `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`; `2a3961cadc76bb16a425042172ffe32481da89b5` is retained only for reproducible legacy builds.
 
 Compatibility checks report known changes and automatically apply only unambiguous renames. Removed `.reverse()`, byte ordering, bitwise typing, and any state-layout change require manual review. Every migration still requires a full compile with realistic constructor arguments and adversarial transaction tests.
 

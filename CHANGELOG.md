@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.6 — 2026-08-09
+
+- Updated the default SHA-256-pinned official SilverScript compiler to `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`; the `2a3961c` legacy profile remains available for reproducibility.
+- Added compatibility findings and compiler-backed regression tests for duplicate function names, entry parameters that shadow contract fields, and non-numeric ordered comparisons; documented the new `g16.verify` Groth16 builtin.
+- Recompiled every built-in template with realistic constructor arguments against the new compiler and retained TN10-only, fail-closed deployment policy for experimental templates and KCC721.
+- Fixed a false-positive `SS002` warning for same-input `scriptPubKey` continuation checks.
+- Fixed stale toolchain commit text, stale “no work open” state, and non-localized template project names; applying a template now preserves the user's project name.
+- Improved wallet onboarding after the one-time recovery backup by selecting the new wallet and explicitly focusing the password-to-connect step without retaining the password.
+- Updated vulnerable transitive `postcss` and `nanoid` versions; `npm audit` now reports zero known vulnerabilities.
+
+## 0.2.6 — 2026-08-09（中文）
+
+- 默认官方 SilverScript 编译器升级并固定到 `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`，继续保留 `2a3961c` 旧版复现档案；所有二进制均校验 SHA-256。
+- 增加重复函数名、入口参数遮蔽契约字段、非数值有序比较的兼容性提示与编译器回归测试，并记录新的 `g16.verify` Groth16 内建函数。
+- 使用真实构造参数和新编译器重新完整编译全部内置模板；实验模板与 KCC721 继续仅限 TN10，并保持部署失效关闭。
+- 修复同一输入 `scriptPubKey` 延续检查被错误报告为 `SS002` 的误报。
+- 修复工具链提交号陈旧、已打开项目仍显示“没有打开的工作”、模板项目名称未本地化；应用模板时不再覆盖用户自定义项目名。
+- 改进一次性助记词备份后的钱包引导：自动选中新钱包并聚焦重新输入密码连接，同时不保留钱包密码。
+- 更新存在安全公告的间接依赖 `postcss` 与 `nanoid`；`npm audit` 现为零已知漏洞。
+
 ## 0.2.5 — 2026-08-07
 
 - Added the minimum macOS Hardened Runtime JIT entitlement required by the bundled Node/V8 sidecar, fixing immediate `SIGTRAP` termination and local-service startup failure on Apple Silicon.

@@ -64,6 +64,77 @@ function lineAt(source, offset) {
   return source.slice(0, offset).split("\n").length;
 }
 
+function latestHardeningFindings(source, target) {
+  if (target.upstreamCommit !== "cb34aa5e6a598f9e461c4ad7014279ba89251d8d") return [];
+  const findings = [];
+  const declarations = new Map();
+  const functionPattern = /\b(?:entry|function)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+  let match;
+  while ((match = functionPattern.exec(source))) {
+    const previous = declarations.get(match[1]);
+    if (previous !== undefined) {
+      findings.push({
+        id: "duplicate-function-name",
+        severity: "error",
+        introducedBy: "cb34aa5",
+        fromProfile: "latest-4b0e1cd",
+        toProfile: target.id,
+        pattern: null,
+        replacement: null,
+        line: lineAt(source, match.index),
+        detected: true,
+        messageZh: `函数 ${match[1]} 与第 ${lineAt(source, previous)} 行的声明重名；最新编译器会拒绝它。`,
+        messageEn: `Function ${match[1]} duplicates its declaration on line ${lineAt(source, previous)}; the latest compiler rejects it.`
+      });
+    } else declarations.set(match[1], match.index);
+  }
+
+  const bodyStart = source.indexOf("{", source.search(/\bcontract\b/));
+  const firstFunction = bodyStart < 0 ? -1 : source.slice(bodyStart + 1).search(/\b(?:entry|function)\s+[A-Za-z_]/);
+  const fieldArea = bodyStart < 0 ? "" : source.slice(bodyStart + 1, firstFunction < 0 ? source.length : bodyStart + 1 + firstFunction);
+  const fields = new Set();
+  const fieldPattern = /^\s*(?![^\n]*\bconstant\b)[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]\n]*\])*\s+([A-Za-z_][A-Za-z0-9_]*)\s*=/gm;
+  while ((match = fieldPattern.exec(fieldArea))) fields.add(match[1]);
+  const entryPattern = /\bentry\s+[A-Za-z_][A-Za-z0-9_]*\s*\(([^)]*)\)/g;
+  while ((match = entryPattern.exec(source))) {
+    for (const parameter of match[1].split(",")) {
+      const name = parameter.trim().match(/([A-Za-z_][A-Za-z0-9_]*)\s*$/)?.[1];
+      if (!name || !fields.has(name)) continue;
+      findings.push({
+        id: "entry-parameter-shadows-field",
+        severity: "error",
+        introducedBy: "cb34aa5",
+        fromProfile: "latest-4b0e1cd",
+        toProfile: target.id,
+        pattern: null,
+        replacement: null,
+        line: lineAt(source, match.index),
+        detected: true,
+        messageZh: `入口参数 ${name} 与契约字段同名；最新编译器会拒绝它。`,
+        messageEn: `Entry parameter ${name} shadows a contract field; the latest compiler rejects it.`
+      });
+    }
+  }
+
+  const nonNumericComparison = /(?:"(?:[^"\\]|\\.)*"|\b(?:true|false)\b)\s*(?:<=|>=|<|>)|(?:<=|>=|<|>)\s*(?:"(?:[^"\\]|\\.)*"|\b(?:true|false)\b)/g;
+  while ((match = nonNumericComparison.exec(source))) {
+    findings.push({
+      id: "ordered-comparison-numeric-only",
+      severity: "error",
+      introducedBy: "cb34aa5",
+      fromProfile: "latest-4b0e1cd",
+      toProfile: target.id,
+      pattern: null,
+      replacement: null,
+      line: lineAt(source, match.index),
+      detected: true,
+      messageZh: "有序比较现在只接受 int 或 byte；最新编译器会拒绝明显的字符串或布尔比较。",
+      messageEn: "Ordered comparisons now accept only int or byte; the latest compiler rejects string or boolean comparisons."
+    });
+  }
+  return findings;
+}
+
 function constructorParameterTypes(source) {
   const start = source.search(/\bcontract\s+[A-Za-z_][A-Za-z0-9_]*\s*\(/);
   if (start < 0) return [];
@@ -153,6 +224,7 @@ export function detectBreakingChanges(source, targetProfileId = config.compiler.
       if (!match[0].length) expression.lastIndex += 1;
     }
   }
+  findings.push(...latestHardeningFindings(text, target));
   const blockers = findings.filter((finding) => finding.severity === "error");
   return {
     targetProfileId: target.id,
@@ -205,8 +277,9 @@ export async function staticAnalyze(source) {
       });
     }
   }
-  const scriptComparison = /scriptPubKey\s*==\s*(?!byte\[\]\s*\()([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)/g;
+  const scriptComparison = /scriptPubKey\s*==\s*(?!byte\[\]\s*\()([A-Za-z_]\w*(?:(?:\s*\[[^\]\n]+\])|(?:\.[A-Za-z_]\w*))*)/g;
   while ((match = scriptComparison.exec(text))) {
+    if (/\.scriptPubKey$/.test(match[1].replace(/\s+/g, ""))) continue;
     findings.push({
       code: "SS002",
       line: line(match.index),

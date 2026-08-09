@@ -319,6 +319,18 @@ test("human template fields deterministically produce compile-ready constructor 
   }
 });
 
+test("template project names follow the requested UI language", () => {
+  const templates = new TemplateStore();
+  const template = templates.get("inheritance-vault");
+  const parameters = configuredTemplateParameters(template);
+  const zh = templates.projectInput(template.id, "tn10", parameters, { language: "zh" });
+  const en = templates.projectInput(template.id, "tn10", parameters, { language: "en" });
+  assert.equal(zh.name, template.titleZh);
+  assert.equal(zh.specification.title, template.titleZh);
+  assert.equal(en.name, template.titleEn);
+  assert.equal(en.specification.title, template.titleEn);
+});
+
 test("template fields reject wrong-network and duplicate authorization wallets", () => {
   const templates = new TemplateStore();
   const owner = templates.get("owner-vault");
@@ -636,23 +648,46 @@ contract Compatibility(pubkey owner) {
   }
 }`;
   const profiles = compilerProfiles();
-  assert.deepEqual(profiles.map((profile) => profile.id), ["latest-4b0e1cd", "legacy-2a3961c"]);
+  assert.deepEqual(profiles.map((profile) => profile.id), ["latest-cb34aa5", "legacy-2a3961c"]);
   assert.ok(profiles.every((profile) => profile.configured));
-  const report = detectBreakingChanges(`${legacySource}\n// checkSigFromStack and tx.inputs[0].outpointTransactionHash.reverse()`, "latest-4b0e1cd");
+  const report = detectBreakingChanges(`${legacySource}\n// checkSigFromStack and tx.inputs[0].outpointTransactionHash.reverse()`, "latest-cb34aa5");
   assert.equal(report.compatible, false);
   assert.ok(report.findings.some((finding) => finding.id === "entry-syntax" && finding.line === 3));
   assert.ok(report.findings.some((finding) => finding.id === "reverse-removed" && finding.replacement === null));
-  const migrated = migrateSourceToProfile(legacySource, "latest-4b0e1cd");
+  const migrated = migrateSourceToProfile(legacySource, "latest-cb34aa5");
   assert.deepEqual(migrated.applied, ["entry-syntax"]);
   assert.equal(migrated.report.compatible, true);
   const owner = byteArray(new Uint8Array(32).fill(3));
   const legacyArtifact = await compileContract({ source: legacySource, constructorArgs: [owner], compilerProfileId: "legacy-2a3961c" });
-  const latestArtifact = await compileContract({ source: migrated.source, constructorArgs: [owner], compilerProfileId: "latest-4b0e1cd" });
+  const latestArtifact = await compileContract({ source: migrated.source, constructorArgs: [owner], compilerProfileId: "latest-cb34aa5" });
   assert.equal(legacyArtifact.compiler.artifactBytecodeField, "script");
   assert.equal(latestArtifact.compiler.artifactBytecodeField, "bytecode");
-  const encoded = encodeConstructorArgsForProfile(migrated.source, [owner], "latest-4b0e1cd");
+  const encoded = encodeConstructorArgsForProfile(migrated.source, [owner], "latest-cb34aa5");
   assert.equal(encoded[0].data.type_ref.base, "byte");
   assert.deepEqual(encoded[0].data.type_ref.array_dims, [{ kind: "fixed", value: 32 }]);
+});
+
+test("latest compiler profile detects and enforces cb34aa5 hardening changes", async () => {
+  const duplicate = `pragma silverscript ^0.1.0;
+contract Duplicate() {
+  function same() { require(true); }
+  entry same() { require(true); }
+}`;
+  const shadow = `pragma silverscript ^0.1.0;
+contract Shadow() {
+  int field = 1;
+  entry spend(int field) { require(field > 0); }
+}`;
+  const ordered = `pragma silverscript ^0.1.0;
+contract Ordered() {
+  entry spend() { require("b" > "a"); }
+}`;
+  assert.ok(detectBreakingChanges(duplicate, "latest-cb34aa5").findings.some((finding) => finding.id === "duplicate-function-name"));
+  assert.ok(detectBreakingChanges(shadow, "latest-cb34aa5").findings.some((finding) => finding.id === "entry-parameter-shadows-field"));
+  assert.ok(detectBreakingChanges(ordered, "latest-cb34aa5").findings.some((finding) => finding.id === "ordered-comparison-numeric-only"));
+  await assert.rejects(compileContract({ source: duplicate, compilerProfileId: "latest-cb34aa5" }), /duplicate function name/i);
+  await assert.rejects(compileContract({ source: shadow, compilerProfileId: "latest-cb34aa5" }), /conflicts with contract field/i);
+  await assert.rejects(compileContract({ source: ordered, compilerProfileId: "latest-cb34aa5" }), /ordered comparison requires numeric operands/i);
 });
 
 test("CovenantStateSource rejects false matches, records fallback and fails on ambiguity", async () => {
@@ -949,7 +984,7 @@ test("TN10 Experimental KCC721 pack compiles all pinned contracts and blocks sta
   for (const contract of pack.packContracts) {
     const artifact = await compileContract({ source: contract.source, constructorArgs: contract.constructorArgs, compilerProfileId: pack.compilerProfileId });
     assert.ok(artifact.programHex.length > 0, contract.id);
-    assert.equal(artifact.compiler.id, "latest-4b0e1cd");
+    assert.equal(artifact.compiler.id, "latest-cb34aa5");
     compiled.set(contract.id, artifact);
   }
   const configured = templates.projectInput(pack.id, "tn10", configuredTemplateParameters(pack));
@@ -1197,6 +1232,12 @@ contract Risky() {
   }
 }`);
   assert.deepEqual(risky.findings.map((finding) => finding.code), ["SS001", "SS002", "SS003", "SS004"]);
+  const sameInputScript = await staticAnalyze(`contract Continuation() {
+    entry spend() {
+      require(tx.outputs[0].scriptPubKey == tx.inputs[this.activeInputIndex].scriptPubKey);
+    }
+  }`);
+  assert.equal(sameInputScript.findings.some((finding) => finding.code === "SS002"), false);
 });
 
 test("deployment builder rejects source edited after compilation before network access", async () => {

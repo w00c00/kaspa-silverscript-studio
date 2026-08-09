@@ -297,7 +297,7 @@ export class TemplateStore {
       }
     }
     return {
-      name: template.titleEn,
+      name: options.language === "zh" ? template.titleZh : template.titleEn,
       network: selectedNetwork,
       requirements: template.requirementsEn,
       source: template.source,
@@ -306,7 +306,7 @@ export class TemplateStore {
       templateParameters: parameters,
       deployAmount,
       specification: {
-        title: template.titleEn,
+        title: options.language === "zh" ? template.titleZh : template.titleEn,
         summaryZh: template.descriptionZh,
         summaryEn: template.descriptionEn,
         network: selectedNetwork === "mainnet" ? "mainnet" : "testnet-10",

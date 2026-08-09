@@ -8,7 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(ROOT, ".env") });
 dotenv.config({ path: path.join(ROOT, ".env.local"), override: true });
 
-export const SILVERSCRIPT_COMMIT = "4b0e1cd69739934f92c3ac4df1bb13d912418b2b";
+export const SILVERSCRIPT_COMMIT = "cb34aa5e6a598f9e461c4ad7014279ba89251d8d";
 export const SILVERSCRIPT_LEGACY_COMMIT = "2a3961cadc76bb16a425042172ffe32481da89b5";
 
 export const NETWORKS = Object.freeze({
@@ -63,8 +63,11 @@ function loadCompilerConfig() {
       builtAt: local.builtAt || legacyStored.builtAt || ""
     })];
   }));
+  const defaultProfileId = profiles[stored.defaultProfileId]
+    ? stored.defaultProfileId
+    : compatibility.defaultProfileId || "latest-cb34aa5";
   return Object.freeze({
-    defaultProfileId: stored.defaultProfileId || compatibility.defaultProfileId || "latest-4b0e1cd",
+    defaultProfileId,
     profiles: Object.freeze(profiles),
     breakingChanges: Object.freeze(Array.isArray(compatibility.breakingChanges) ? compatibility.breakingChanges : []),
     manifestFile: file,

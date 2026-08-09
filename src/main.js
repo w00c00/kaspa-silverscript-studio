@@ -120,7 +120,8 @@ const state = {
   localOperationProjectId: "",
   lifecycleInviteProjectId: "",
   pendingDeleteProjectId: "",
-  pendingSourceMigration: null
+  pendingSourceMigration: null,
+  pendingCreatedWalletId: ""
 };
 
 function tr(key) { return copy[state.language]?.[key] || copy.zh[key] || key; }
@@ -254,7 +255,7 @@ function projectPayload() {
     requirements: $("#requirements").value,
     source: $("#source-editor").value,
     constructorArgs,
-    compilerProfileId: $("#compiler-profile").value || state.config?.compiler?.defaultProfileId || "latest-4b0e1cd",
+    compilerProfileId: $("#compiler-profile").value || state.config?.compiler?.defaultProfileId || "latest-cb34aa5",
     templateParameters: state.project?.templateParameters || {},
     deployAmount: $("#deploy-amount").value,
     specification: state.project?.specification || null,
@@ -316,11 +317,13 @@ function loadProjectIntoUi(project) {
   state.draft = null;
   $("#project-name").disabled = false;
   $("#no-project-banner").hidden = true;
+  $("#save-label").textContent = tr("savedLocal");
+  $("#save-dot").classList.remove("saving");
   $("#project-name").value = project.name || "Untitled Covenant";
   $("#requirements").value = project.requirements || "";
   $("#source-editor").value = project.source || "";
   $("#constructor-args").value = JSON.stringify(project.constructorArgs || [], null, 2);
-  $("#compiler-profile").value = project.compilerProfileId || project.artifact?.compiler?.id || project.review?.compilerProfileId || state.config?.compiler?.defaultProfileId || "latest-4b0e1cd";
+  $("#compiler-profile").value = project.compilerProfileId || project.artifact?.compiler?.id || project.review?.compilerProfileId || state.config?.compiler?.defaultProfileId || "latest-cb34aa5";
   renderCompilerProfileHelp();
   $("#deploy-amount").value = project.deployAmount || "0.05";
   $("#deploy-network").value = project.network || "tn10";
@@ -384,7 +387,7 @@ function renderProjectList() {
 async function createProject(templateId = "", parameters = null) {
   const name = state.language === "zh" ? "新的 Covenant" : "New Covenant";
   const endpoint = templateId ? `/api/templates/${encodeURIComponent(templateId)}/projects` : "/api/projects";
-  const { project } = await api(endpoint, { method: "POST", body: JSON.stringify(templateId ? { network: $("#deploy-network").value, parameters } : { name }) });
+  const { project } = await api(endpoint, { method: "POST", body: JSON.stringify(templateId ? { network: $("#deploy-network").value, parameters, language: state.language } : { name }) });
   await loadProjects(false);
   loadProjectIntoUi(project);
   selectTab(templateId ? "source" : "design");
@@ -707,7 +710,7 @@ async function applyPendingTemplate() {
   const template = state.templates.find((item) => item.id === id);
   const { project } = await api(`/api/projects/${encodeURIComponent(state.project.id)}/template/${encodeURIComponent(id)}`, {
     method: "PUT",
-    body: JSON.stringify({ network: $("#deploy-network").value, parameters })
+    body: JSON.stringify({ network: $("#deploy-network").value, parameters, language: state.language })
   });
   loadProjectIntoUi(project);
   await loadProjects(false);
@@ -1186,7 +1189,10 @@ async function createLocalWallet() {
     clearWalletSecrets();
     await loadWallets();
     $("#wallet-select").value = result.wallet.id;
-    if (result.recoveryPhrase) showRecoveryPhrase(result.recoveryPhrase, result.wallet.paymentSecretProtected);
+    if (result.recoveryPhrase) {
+      state.pendingCreatedWalletId = result.wallet.id;
+      showRecoveryPhrase(result.recoveryPhrase, result.wallet.paymentSecretProtected);
+    }
     else toast(state.language === "zh" ? "钱包已加密导入，请在上方输入密码连接" : "Wallet imported. Enter its password above to connect", "good");
   } catch (error) { toast(error.message, "bad"); }
   finally { button.disabled = false; }
@@ -1963,6 +1969,7 @@ async function init() {
   const session = await waitForApi();
   state.token = session.token;
   state.config = await api("/api/config");
+  $("#skill-state").textContent = String(state.config.skill?.upstreamCommit || "—").slice(0, 7);
   renderCompilerProfiles();
   $("#compiler-state").textContent = state.config.compiler.configured ? "PINNED" : "SETUP REQUIRED";
   $("#compiler-state").className = state.config.compiler.configured ? "good" : "warn";
@@ -2040,7 +2047,18 @@ $("#wallet-confirm-transfer").addEventListener("click", confirmWalletTransfer);
 [$("#wallet-send-recipient"), $("#wallet-send-amount"), $("#wallet-send-mainnet-phrase")].forEach((input) => input.addEventListener("input", resetTransferDraft));
 $("#recovery-confirm").addEventListener("change", () => { $("#recovery-done").disabled = !$("#recovery-confirm").checked; });
 $("#recovery-dialog").addEventListener("cancel", (event) => { if (!$("#recovery-confirm").checked) event.preventDefault(); });
-$("#recovery-dialog").addEventListener("close", () => { $("#recovery-phrase").textContent = ""; $("#recovery-passphrase-warning").hidden = true; $("#recovery-confirm").checked = false; $("#recovery-done").disabled = true; });
+$("#recovery-dialog").addEventListener("close", () => {
+  $("#recovery-phrase").textContent = "";
+  $("#recovery-passphrase-warning").hidden = true;
+  $("#recovery-confirm").checked = false;
+  $("#recovery-done").disabled = true;
+  if (state.pendingCreatedWalletId) {
+    $("#wallet-select").value = state.pendingCreatedWalletId;
+    state.pendingCreatedWalletId = "";
+    toast(state.language === "zh" ? "钱包已加密保存；请在上方重新输入密码并连接" : "Wallet encrypted and saved. Re-enter its password above to connect", "good");
+    $("#wallet-password").focus();
+  }
+});
 $("#wallet-dialog").addEventListener("close", clearWalletSecrets);
 $("#build-draft").addEventListener("click", buildAndBroadcast);
 $("#external-covenant-inspect").addEventListener("click", inspectExternalCovenant);

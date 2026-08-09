@@ -125,15 +125,16 @@ app.post("/api/wallets/transfer/broadcast", async (req, res, next) => {
 app.get("/api/templates", (_req, res) => res.json({ templates: templates.list() }));
 app.post("/api/templates/:id/projects", (req, res, next) => {
   try {
-    const input = templates.projectInput(req.params.id, req.body?.network, req.body?.parameters);
+    const input = templates.projectInput(req.params.id, req.body?.network, req.body?.parameters, { language: req.body?.language });
     res.status(201).json({ project: projects.create(input) });
   } catch (error) { next(error); }
 });
 app.put("/api/projects/:projectId/template/:templateId", (req, res, next) => {
   try {
     if (!projects.get(req.params.projectId)) return res.status(404).json({ error: "Project not found" });
-    const input = templates.projectInput(req.params.templateId, req.body?.network, req.body?.parameters);
-    res.json({ project: projects.save(req.params.projectId, { ...input, artifact: null, deployment: null }) });
+    const current = projects.get(req.params.projectId);
+    const input = templates.projectInput(req.params.templateId, req.body?.network, req.body?.parameters, { language: req.body?.language });
+    res.json({ project: projects.save(req.params.projectId, { ...input, name: current.name, artifact: null, deployment: null }) });
   } catch (error) { next(error); }
 });
 

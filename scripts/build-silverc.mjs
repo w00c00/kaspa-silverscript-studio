@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { cargoReleaseBinary, executableName, makeExecutable } from "./platform-binaries.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const latestCommit = "4b0e1cd69739934f92c3ac4df1bb13d912418b2b";
+const latestCommit = "cb34aa5e6a598f9e461c4ad7014279ba89251d8d";
 const legacyCommit = "2a3961cadc76bb16a425042172ffe32481da89b5";
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "silverstudio-silverc-"));
 
@@ -55,7 +55,7 @@ function buildProfile({ id, commit, outputName, configuredSource }) {
 try {
   fs.mkdirSync(path.join(root, "config"), { recursive: true });
   const latestBin = buildProfile({
-    id: "latest-4b0e1cd",
+    id: "latest-cb34aa5",
     commit: latestCommit,
     outputName: "silverc-latest",
     configuredSource: process.env.SILVERSCRIPT_LATEST_SOURCE || process.env.SILVERSCRIPT_SOURCE || ""
@@ -69,9 +69,9 @@ try {
   const latestSha256 = sha256(latestBin);
   const legacySha256 = sha256(legacyBin);
   const manifest = {
-    defaultProfileId: "latest-4b0e1cd",
+    defaultProfileId: "latest-cb34aa5",
     profiles: {
-      "latest-4b0e1cd": {
+      "latest-cb34aa5": {
         bin: latestBin,
         sha256: latestSha256,
         upstreamCommit: latestCommit,

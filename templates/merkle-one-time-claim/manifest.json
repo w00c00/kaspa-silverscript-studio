@@ -7,7 +7,7 @@
   "descriptionEn": "A claimant consumes the UTXO once with a committed Merkle proof and salt; the refund wallet recovers it after timeout. TN10 experimental only.",
   "experimentalOnly": true,
   "networkAllowlist": ["tn10"],
-  "compilerProfileId": "latest-4b0e1cd",
+  "compilerProfileId": "latest-cb34aa5",
   "requirementsEn": "Allow exactly one claimant to consume a Merkle-committed claim before a timeout, with a signed refund path afterwards.",
   "risk": "experimental",
   "sourceFile": "contract.sil",
