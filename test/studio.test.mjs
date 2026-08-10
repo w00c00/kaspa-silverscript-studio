@@ -95,6 +95,7 @@ function configuredTemplateParameters(template, network = "testnet-10") {
     if (field.type === "address") return [field.id, new kaspa.XOnlyPublicKey(TEMPLATE_KEYS[addressIndex++ % TEMPLATE_KEYS.length]).toAddress(network).toString()];
     if (field.type === "datetime") return [field.id, "2035-01-02T03:04:00.000Z"];
     if (field.type === "sha256") return [field.id, "42".repeat(32)];
+    if (field.type === "hexBytes") return [field.id, "42".repeat(Math.max(1, Number(field.minimumBytes || 1)))];
     if (field.type === "choice") return [field.id, String(field.default || field.options?.[0]?.value || "")];
     if (field.type === "kcc721CollectionId") return [field.id, ""];
     if (field.type === "kcc721Metadata") return [field.id, structuredClone(field.default || { name: "TN10 test NFT", attributes: [] })];
@@ -680,26 +681,26 @@ contract Compatibility(pubkey owner) {
   }
 }`;
   const profiles = compilerProfiles();
-  assert.deepEqual(profiles.map((profile) => profile.id), ["latest-cb34aa5", "legacy-2a3961c"]);
+  assert.deepEqual(profiles.map((profile) => profile.id), ["latest-6f9e078", "latest-cb34aa5", "legacy-2a3961c"]);
   assert.ok(profiles.every((profile) => profile.configured));
-  const report = detectBreakingChanges(`${legacySource}\n// checkSigFromStack and tx.inputs[0].outpointTransactionHash.reverse()`, "latest-cb34aa5");
+  const report = detectBreakingChanges(`${legacySource}\n// checkSigFromStack and tx.inputs[0].outpointTransactionHash.reverse()`, "latest-6f9e078");
   assert.equal(report.compatible, false);
   assert.ok(report.findings.some((finding) => finding.id === "entry-syntax" && finding.line === 3));
   assert.ok(report.findings.some((finding) => finding.id === "reverse-removed" && finding.replacement === null));
-  const migrated = migrateSourceToProfile(legacySource, "latest-cb34aa5");
+  const migrated = migrateSourceToProfile(legacySource, "latest-6f9e078");
   assert.deepEqual(migrated.applied, ["entry-syntax"]);
   assert.equal(migrated.report.compatible, true);
   const owner = byteArray(new Uint8Array(32).fill(3));
   const legacyArtifact = await compileContract({ source: legacySource, constructorArgs: [owner], compilerProfileId: "legacy-2a3961c" });
-  const latestArtifact = await compileContract({ source: migrated.source, constructorArgs: [owner], compilerProfileId: "latest-cb34aa5" });
+  const latestArtifact = await compileContract({ source: migrated.source, constructorArgs: [owner], compilerProfileId: "latest-6f9e078" });
   assert.equal(legacyArtifact.compiler.artifactBytecodeField, "script");
   assert.equal(latestArtifact.compiler.artifactBytecodeField, "bytecode");
-  const encoded = encodeConstructorArgsForProfile(migrated.source, [owner], "latest-cb34aa5");
+  const encoded = encodeConstructorArgsForProfile(migrated.source, [owner], "latest-6f9e078");
   assert.equal(encoded[0].data.type_ref.base, "byte");
   assert.deepEqual(encoded[0].data.type_ref.array_dims, [{ kind: "fixed", value: 32 }]);
 });
 
-test("latest compiler profile detects and enforces cb34aa5 hardening changes", async () => {
+test("latest compiler profile detects cb34aa5 hardening and 6f9e078 scalar conversions", async () => {
   const duplicate = `pragma silverscript ^0.1.0;
 contract Duplicate() {
   function same() { require(true); }
@@ -714,12 +715,15 @@ contract Shadow() {
 contract Ordered() {
   entry spend() { require("b" > "a"); }
 }`;
-  assert.ok(detectBreakingChanges(duplicate, "latest-cb34aa5").findings.some((finding) => finding.id === "duplicate-function-name"));
-  assert.ok(detectBreakingChanges(shadow, "latest-cb34aa5").findings.some((finding) => finding.id === "entry-parameter-shadows-field"));
-  assert.ok(detectBreakingChanges(ordered, "latest-cb34aa5").findings.some((finding) => finding.id === "ordered-comparison-numeric-only"));
-  await assert.rejects(compileContract({ source: duplicate, compilerProfileId: "latest-cb34aa5" }), /duplicate function name/i);
-  await assert.rejects(compileContract({ source: shadow, compilerProfileId: "latest-cb34aa5" }), /conflicts with contract field/i);
-  await assert.rejects(compileContract({ source: ordered, compilerProfileId: "latest-cb34aa5" }), /ordered comparison requires numeric operands/i);
+  assert.ok(detectBreakingChanges(duplicate, "latest-6f9e078").findings.some((finding) => finding.id === "duplicate-function-name"));
+  assert.ok(detectBreakingChanges(shadow, "latest-6f9e078").findings.some((finding) => finding.id === "entry-parameter-shadows-field"));
+  assert.ok(detectBreakingChanges(ordered, "latest-6f9e078").findings.some((finding) => finding.id === "ordered-comparison-numeric-only"));
+  const conversions = detectBreakingChanges(`contract Cast() { entry run(int value, byte witness) { byte b = byte(value); int i = int(witness); } }`, "latest-6f9e078");
+  assert.ok(conversions.findings.some((finding) => finding.id === "explicit-runtime-int-to-byte"));
+  assert.ok(conversions.findings.some((finding) => finding.id === "explicit-byte-signedness"));
+  await assert.rejects(compileContract({ source: duplicate, compilerProfileId: "latest-6f9e078" }), /duplicate function name/i);
+  await assert.rejects(compileContract({ source: shadow, compilerProfileId: "latest-6f9e078" }), /conflicts with contract field/i);
+  await assert.rejects(compileContract({ source: ordered, compilerProfileId: "latest-6f9e078" }), /ordered comparison requires numeric operands/i);
 });
 
 test("CovenantStateSource rejects false matches, records fallback and fails on ambiguity", async () => {
@@ -784,6 +788,7 @@ test("external covenant packages bind the P2SH program, covenant id, ABI slot, f
     assert.equal(inspected.review.covenantId, covenantId);
     assert.equal(inspected.review.feeSompi, "1000");
     assert.equal(inspected.review.signatureSlots[0].signed, false);
+    assert.equal(inspected.review.descriptorStatus, "legacy-missing");
     const exported = exportExternalCovenantPackage(packageValue, path.join(directory, "downloads"));
     assert.match(exported.filename, /^silverscript-[0-9a-f]{12}\.ssinvite$/);
     assert.deepEqual(JSON.parse(fs.readFileSync(exported.file, "utf8")), inspected.package);
@@ -862,6 +867,15 @@ contract AtomicCell() { entry spend() { require(true); } }`;
     assert.deepEqual(inspected.review.targetInputIndexes, [0, 1]);
     assert.equal(inspected.review.p2pkAuthorization.signed, false);
     assert.equal(inspected.review.complete, false);
+    assert.equal(inspected.review.descriptorStatus, "verified-v1");
+    assert.equal(inspected.package.networkCaip2, "kaspa:testnet-10");
+    assert.ok(inspected.package.covenantInputs.every((item) => /^[0-9a-f]{64}$/.test(item.descriptorSha256)));
+    const forgedDescriptor = structuredClone(pkg);
+    forgedDescriptor.covenantInputs[0].descriptor.abi.sha256 = "00".repeat(32);
+    assert.throws(() => inspectExternalCovenantPackage(forgedDescriptor), /ABI commitment does not match/i);
+    const caipAlias = structuredClone(pkg);
+    caipAlias.network = "kaspa:testnet-10";
+    assert.equal(inspectExternalCovenantPackage(caipAlias).review.network, "tn10");
     const signed = await signP2pkCoSpendPackage({
       package: inspected.package,
       walletId: created.wallet.id,
@@ -1016,7 +1030,7 @@ test("TN10 Experimental KCC721 pack compiles all pinned contracts and blocks sta
   for (const contract of pack.packContracts) {
     const artifact = await compileContract({ source: contract.source, constructorArgs: contract.constructorArgs, compilerProfileId: pack.compilerProfileId });
     assert.ok(artifact.programHex.length > 0, contract.id);
-    assert.equal(artifact.compiler.id, "latest-cb34aa5");
+    assert.equal(artifact.compiler.id, "latest-6f9e078");
     compiled.set(contract.id, artifact);
   }
   const configured = templates.projectInput(pack.id, "tn10", configuredTemplateParameters(pack));
@@ -1156,7 +1170,8 @@ test("every built-in template exposes a deterministic reverse operation package"
     ["timelock-transfer", { operationId: "claim", feeKas: "0.01" }],
     ["two-of-three", { operationId: "spend", destinationAddress: destination, signerAddresses: null, feeKas: "0.01" }],
     ["hashlock-refund", { operationId: "refund", feeKas: "0.01" }],
-    ["inheritance-vault", { operationId: "checkIn", feeKas: "0.01" }]
+    ["inheritance-vault", { operationId: "checkIn", feeKas: "0.01" }],
+    ["groth16-proof-release", { operationId: "claim", proofHex: "42", feeKas: "0.01" }]
   ];
   for (const [templateId, operationInput] of cases) {
     const template = templates.get(templateId);
@@ -1203,8 +1218,12 @@ test("every built-in template exposes a deterministic reverse operation package"
     assert.equal(built.review.covenantId, covenantId, templateId);
     const operations = templateOperations(project);
     assert.ok(operations.length >= 1, templateId);
-    assert.equal(built.review.feeSompi, templateId === "two-of-three" ? "1500000" : "1250000", templateId);
-    assert.equal(built.fee.signatureExecutionReserveSompi, templateId === "two-of-three" ? "500000" : "250000", templateId);
+    const proofOnly = templateId === "groth16-proof-release";
+    assert.equal(built.review.feeSompi, templateId === "two-of-three" ? "1500000" : proofOnly ? "1000000" : "1250000", templateId);
+    assert.equal(built.fee.signatureExecutionReserveSompi, templateId === "two-of-three" ? "500000" : proofOnly ? "0" : "250000", templateId);
+    assert.equal(built.review.descriptorStatus, "verified-v1", templateId);
+    assert.match(built.review.descriptorSha256, /^[0-9a-f]{64}$/, templateId);
+    assert.ok(built.package.covenantInput.descriptor.controlPrincipals.length >= 1, templateId);
     assert.equal(built.preflight.verdict, "ready", templateId);
     if (templateId === "two-of-three") {
       assert.deepEqual(operations[0].availableSigners, [

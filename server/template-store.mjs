@@ -83,6 +83,14 @@ function hex32(value) {
   return text;
 }
 
+function hexBytes(value, minimumBytes = 1, maximumBytes = 520) {
+  const text = String(value || "").trim().toLowerCase().replace(/^0x/, "");
+  if (!/^[0-9a-f]*$/.test(text) || text.length % 2) throw parameterError("Template byte data must be valid hexadecimal data");
+  const length = text.length / 2;
+  if (length < minimumBytes || length > maximumBytes) throw parameterError(`Template byte data must contain ${minimumBytes}-${maximumBytes} bytes`);
+  return { hex: text, data: Array.from(Buffer.from(text, "hex")) };
+}
+
 function durationDays(value, minimum = 1, maximum = 3650) {
   const days = Number(String(value ?? "").trim());
   if (!Number.isSafeInteger(days) || days < minimum || days > maximum) {
@@ -235,6 +243,10 @@ export class TemplateStore {
         const value = hex32(raw);
         parameters[field.id] = value;
         if (Number.isInteger(field.argIndex)) constructorArgs[field.argIndex] = compilerExpression({ kind: "bytes32", hex: value });
+      } else if (field.type === "hexBytes") {
+        const value = hexBytes(raw, Number(field.minimumBytes || 1), Number(field.maximumBytes || 520));
+        parameters[field.id] = value.hex;
+        if (Number.isInteger(field.argIndex)) constructorArgs[field.argIndex] = compilerExpression({ kind: "byte[]", data: value.data });
       } else if (field.type === "choice") {
         const value = String(raw || "").trim();
         const options = Array.isArray(field.options) ? field.options.map((option) => String(option.value)) : [];

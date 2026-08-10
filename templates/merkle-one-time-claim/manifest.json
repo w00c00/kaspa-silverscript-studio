@@ -7,10 +7,14 @@
   "descriptionEn": "A claimant consumes the UTXO once with a committed Merkle proof and salt; the refund wallet recovers it after timeout. TN10 experimental only.",
   "experimentalOnly": true,
   "networkAllowlist": ["tn10"],
-  "compilerProfileId": "latest-cb34aa5",
+  "compilerProfileId": "latest-6f9e078",
   "requirementsEn": "Allow exactly one claimant to consume a Merkle-committed claim before a timeout, with a signed refund path afterwards.",
   "risk": "experimental",
   "sourceFile": "contract.sil",
+  "controlPrincipals": [
+    { "role": "claimant", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "claimant" },
+    { "role": "refund", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "refundKey" }
+  ],
   "requiredReplacements": [0, 1, 2, 3, 4, 5],
   "parameters": [
     { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.5", "minimum": "0.5", "labelZh": "领取资金", "labelEn": "Claim value", "helpZh": "至少 0.5 TKAS/KAS；扣除显式矿工费后的余额一次性支付给领取人。", "helpEn": "At least 0.5 TKAS/KAS; the full balance minus the explicit miner fee is paid once to the claimant." },

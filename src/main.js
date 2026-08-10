@@ -255,7 +255,7 @@ function projectPayload() {
     requirements: $("#requirements").value,
     source: $("#source-editor").value,
     constructorArgs,
-    compilerProfileId: $("#compiler-profile").value || state.config?.compiler?.defaultProfileId || "latest-cb34aa5",
+    compilerProfileId: $("#compiler-profile").value || state.config?.compiler?.defaultProfileId || "latest-6f9e078",
     templateParameters: state.project?.templateParameters || {},
     deployAmount: $("#deploy-amount").value,
     specification: state.project?.specification || null,
@@ -323,7 +323,7 @@ function loadProjectIntoUi(project) {
   $("#requirements").value = project.requirements || "";
   $("#source-editor").value = project.source || "";
   $("#constructor-args").value = JSON.stringify(project.constructorArgs || [], null, 2);
-  $("#compiler-profile").value = project.compilerProfileId || project.artifact?.compiler?.id || project.review?.compilerProfileId || state.config?.compiler?.defaultProfileId || "latest-cb34aa5";
+  $("#compiler-profile").value = project.compilerProfileId || project.artifact?.compiler?.id || project.review?.compilerProfileId || state.config?.compiler?.defaultProfileId || "latest-6f9e078";
   renderCompilerProfileHelp();
   $("#deploy-amount").value = Number(project.deployAmount || 0) >= 0.5 ? project.deployAmount : "0.5";
   $("#deploy-network").value = project.network || "tn10";
@@ -454,6 +454,7 @@ function templateFieldInput(field, value) {
   if (field.type === "amount") return `<input ${common} inputmode="decimal" min="${esc(field.minimum || "0")}" pattern="^(0|[1-9]\\d*)(\\.\\d{1,8})?$" />`;
   if (field.type === "datetime") return `<input ${common} type="datetime-local" step="1" />`;
   if (field.type === "sha256") return `<input ${common} inputmode="text" maxlength="66" pattern="^(0x)?[0-9a-fA-F]{64}$" autocomplete="off" spellcheck="false" />`;
+  if (field.type === "hexBytes") return `<textarea data-template-parameter="${esc(field.id)}" placeholder="${esc(placeholder)}" ${field.required === false ? "" : "required"} maxlength="${Number(field.maximumBytes || 520) * 2 + 2}" pattern="^(0x)?[0-9a-fA-F]+$" autocomplete="off" spellcheck="false">${esc(value)}</textarea>`;
   if (field.type === "choice") return `<select ${common}>${(field.options || []).map((option) => `<option value="${esc(option.value)}" ${String(value) === String(option.value) ? "selected" : ""}>${esc(language === "zh" ? option.labelZh : option.labelEn)}</option>`).join("")}</select>`;
   if (field.type === "kcc721CollectionId") return `<input ${common} inputmode="text" maxlength="66" pattern="^(0x)?[0-9a-fA-F]{64}$" autocomplete="off" spellcheck="false" />`;
   if (field.type === "integer") return `<input ${common} type="number" min="${esc(field.minimum ?? Number.MIN_SAFE_INTEGER)}" max="${esc(field.maximum ?? Number.MAX_SAFE_INTEGER)}" step="1" />`;
@@ -1493,6 +1494,17 @@ function renderLifecycleOperations() {
   renderLifecycleDestinationDefault();
   $("#lifecycle-secret-row").hidden = !operation?.secret;
   $("#lifecycle-proof-row").hidden = !operation?.proof;
+  if (operation?.proof) {
+    const label = $("#lifecycle-proof-row span");
+    const input = $("#lifecycle-proof");
+    if (operation.proofKind === "groth16") {
+      label.textContent = state.language === "zh" ? "Groth16 证明（十六进制）" : "Groth16 proof (hex)";
+      input.placeholder = state.language === "zh" ? "粘贴压缩 Groth16 证明" : "Paste the compressed Groth16 proof";
+    } else {
+      label.textContent = tr("merkleProofHex");
+      input.placeholder = state.language === "zh" ? "按顺序拼接 32-byte siblings；单叶树留空" : "Concatenate 32-byte siblings; leave empty for a single-leaf tree";
+    }
+  }
   $("#lifecycle-payload-row").hidden = !operation?.payload;
   $("#lifecycle-salt-row").hidden = !operation?.salt;
   $("#lifecycle-signers-row").hidden = !operation?.signers;
@@ -1754,6 +1766,7 @@ function renderExternalCovenantReview(review) {
   }
   const slots = review.signatureSlots || [];
   const p2pk = review.p2pkAuthorization || null;
+  const descriptorVerified = review.descriptorStatus === "verified-v1";
   const outputs = (review.outputs || []).map((output) => `<li>#${output.index} · ${esc(output.valueKas)} ${review.network === "mainnet" ? "KAS" : "TKAS"} → ${esc(output.address ? short(output.address, 14, 10) : "non-address script")}${output.covenantId ? ` · cov ${esc(short(output.covenantId, 8, 7))}` : ""}</li>`).join("");
   el.innerHTML = `<div class="external-review-grid">
     <div><span>${state.language === "zh" ? "网络" : "Network"}</span><code>${esc(review.network)}</code></div>
@@ -1765,7 +1778,12 @@ function renderExternalCovenantReview(review) {
     <div><span>${state.language === "zh" ? "签名槽" : "Signature slots"}</span><code>${slots.filter((slot) => slot.signed).length}/${slots.length}</code></div>
     ${p2pk ? `<div><span>P2PK co-spend</span><code>${p2pk.signed ? (state.language === "zh" ? "已签名" : "Signed") : (state.language === "zh" ? "等待拥有者" : "Awaiting owner")}</code></div>` : ""}
     <div><span>${state.language === "zh" ? "交易承诺" : "Commitment"}</span><code title="${esc(review.commitment)}">${esc(short(review.commitment, 12, 10))}</code></div>
-  </div><ol class="external-outputs">${outputs}</ol><p class="external-warning">${esc(state.language === "zh" ? "ABI 是外部元数据，不能证明 redeem program 的真实语义；签名前必须从可信来源核对源码和 artifact。" : review.warning)}</p>`;
+    <div><span>${state.language === "zh" ? "描述符" : "Descriptor"}</span><code title="${esc(review.descriptorSha256 || "")}">${descriptorVerified ? `v1 · ${esc(short(review.descriptorSha256, 10, 8))}` : (state.language === "zh" ? "旧包／缺失" : "Legacy / missing")}</code></div>
+  </div><ol class="external-outputs">${outputs}</ol><p class="external-warning">${esc(state.language === "zh"
+    ? (descriptorVerified
+      ? "版本化描述符、ABI 和状态布局承诺已匹配，但元数据仍不能证明 redeem program 的真实语义；签名前必须从可信来源核对源码和 artifact。"
+      : "旧版操作包没有版本化描述符。ABI 是外部元数据，不能证明 redeem program 的真实语义；签名前必须从可信来源核对源码和 artifact。")
+    : review.warning)}</p>`;
   const hasUnsignedSlot = slots.some((slot) => !slot.signed);
   const hasUnsignedP2pk = Boolean(p2pk && !p2pk.signed);
   const canSignSlot = Boolean(state.wallet?.kind === "local" && slots.some((slot) => !slot.signed && slot.publicKey === state.wallet.publicKey));

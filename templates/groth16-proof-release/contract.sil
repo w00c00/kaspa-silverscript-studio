@@ -1,0 +1,35 @@
+pragma silverscript ^0.1.0;
+
+// TN10 research template. A valid Groth16 proof releases the complete covenant
+// value, minus an explicit bounded fee, to one constructor-bound recipient.
+contract Groth16ProofRelease(
+    byte[] verifyingKey,
+    byte[32] publicInput0,
+    byte[32] publicInput1,
+    byte[32] publicInput2,
+    byte[32] publicInput3,
+    byte[32] publicInput4,
+    pubkey recipient
+) {
+    int constant MAX_PROOF_BYTES = 520;
+    int constant MAX_MINER_FEE = 10000000;
+
+    entry claim(byte[] proof, int minerFee) {
+        require(verifyingKey.length > 0);
+        require(verifyingKey.length <= 520);
+        require(proof.length > 0);
+        require(proof.length <= MAX_PROOF_BYTES);
+        g16.verify(verifyingKey, proof, publicInput0, publicInput1, publicInput2, publicInput3, publicInput4);
+
+        require(tx.inputs.length == 1);
+        require(this.activeInputIndex == 0);
+        require(tx.outputs.length == 1);
+        require(OpAuthOutputCount(this.activeInputIndex) == 0);
+        require(minerFee >= 1000);
+        require(minerFee <= MAX_MINER_FEE);
+        require(tx.inputs[this.activeInputIndex].value > minerFee);
+        byte[34] recipientScript = new ScriptPubKeyP2PK(recipient);
+        require(tx.outputs[0].scriptPubKey == byte[](recipientScript));
+        require(tx.outputs[0].value == tx.inputs[this.activeInputIndex].value - minerFee);
+    }
+}

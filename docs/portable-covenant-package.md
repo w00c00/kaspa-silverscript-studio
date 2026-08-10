@@ -10,6 +10,7 @@ version-1 交易包。
 {
   "version": 1,
   "network": "tn10",
+  "networkCaip2": "kaspa:testnet-10",
   "transactionSafeJson": "{...Kaspa Transaction Safe JSON...}",
   "covenantInput": {
     "index": 0,
@@ -28,7 +29,20 @@ version-1 交易包。
         "kind": "signature",
         "publicKey": "32-byte x-only public key"
       }
-    ]
+    ],
+    "descriptor": {
+      "schema": "kaspa-covenant-descriptor",
+      "version": 1,
+      "profileId": "producer/template/v1",
+      "network": "kaspa:testnet-10",
+      "programSha256": "32-byte hex",
+      "covenantId": "32-byte hex",
+      "abi": { "encoding": "silverscript-json-abi/v1", "sha256": "32-byte hex" },
+      "state": { "encoding": "silverscript-state-layout/v1", "sha256": "32-byte hex" },
+      "controlPrincipals": [],
+      "authorizationPrincipals": []
+    },
+    "descriptorSha256": "canonical descriptor SHA-256"
   },
   "provenance": {
     "kind": "producer-defined",
@@ -45,6 +59,15 @@ the complete transaction.
 
 当前支持 `sig`、`pubkey`、`int`、`bool`、`byte[]` 和 `byte[N]` 参数。`sig`
 参数代表签名槽；多个本地客户端可以依次导入同一个包并填充自己的签名槽。
+
+New Studio packages include a canonical version-1 descriptor. It binds the CAIP-2
+network, program, covenant ID, ABI, state layout, and recognized principal profiles.
+Unknown principal profiles fail closed. Older packages without a descriptor remain
+readable but are visibly marked as legacy and require stronger independent review.
+
+Studio 新生成的包包含 canonical v1 描述符，绑定 CAIP-2 网络、程序、Covenant ID、ABI、
+状态布局和已识别的主体类型。未知主体 profile 会失效关闭。没有描述符的旧包仍可读取，
+但会明确标成旧版，并要求更严格的独立核对。
 
 ## Why covenant ID alone is insufficient / 为什么只有 covenant ID 不够
 

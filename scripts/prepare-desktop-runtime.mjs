@@ -16,7 +16,7 @@ function copy(relative) {
   fs.cpSync(path.join(root, relative), destination, { recursive: true, force: true });
 }
 
-const helperNames = ["silverc-latest", "silverc-legacy", "kascov-preflight"];
+const helperNames = ["silverc-latest", "silverc-cb34aa5", "silverc-legacy", "kascov-preflight"];
 for (const helper of helperNames) {
   const source = path.join(root, binaryRelativePath(helper));
   if (!fs.existsSync(source)) throw new Error(`Pinned ${executableName(helper)} is missing. Run the matching setup command first.`);

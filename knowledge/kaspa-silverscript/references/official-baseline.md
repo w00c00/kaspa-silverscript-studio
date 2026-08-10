@@ -3,8 +3,8 @@
 ## Verified snapshot
 
 - Repository: <https://github.com/kaspanet/silverscript>
-- Verified commit: `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`
-- Verified date: 2026-08-09
+- Verified commit: `6f9e078b1d8b5389212755183b592704de99fea5`
+- Verified date: 2026-08-10
 - Compiler/language status: experimental
 - Official recommendation at this snapshot: use bytecode artifacts on
   testnet-10 until the first stable v1 release.
@@ -15,17 +15,17 @@ deployment, compatibility, or mainnet-readiness questions.
 ## Primary sources
 
 - Project status and debugger:
-  <https://github.com/kaspanet/silverscript/blob/cb34aa5e6a598f9e461c4ad7014279ba89251d8d/README.md>
+  <https://github.com/kaspanet/silverscript/blob/6f9e078b1d8b5389212755183b592704de99fea5/README.md>
 - Language tutorial:
-  <https://github.com/kaspanet/silverscript/blob/cb34aa5e6a598f9e461c4ad7014279ba89251d8d/docs/TUTORIAL.md>
+  <https://github.com/kaspanet/silverscript/blob/6f9e078b1d8b5389212755183b592704de99fea5/docs/TUTORIAL.md>
 - Covenant declaration semantics:
-  <https://github.com/kaspanet/silverscript/blob/cb34aa5e6a598f9e461c4ad7014279ba89251d8d/docs/DECL.md>
+  <https://github.com/kaspanet/silverscript/blob/6f9e078b1d8b5389212755183b592704de99fea5/docs/DECL.md>
 - Built-ins and cross-template validation:
-  <https://github.com/kaspanet/silverscript/blob/cb34aa5e6a598f9e461c4ad7014279ba89251d8d/silverscript-lang/std/builtins.sil>
+  <https://github.com/kaspanet/silverscript/blob/6f9e078b1d8b5389212755183b592704de99fea5/silverscript-lang/std/builtins.sil>
 - KCC20 book:
   <https://kaspanet.github.io/silverscript/kcc20-book/>
 - Official application examples, including chess:
-  <https://github.com/kaspanet/silverscript/tree/cb34aa5e6a598f9e461c4ad7014279ba89251d8d/silverscript-lang/tests/apps>
+  <https://github.com/kaspanet/silverscript/tree/6f9e078b1d8b5389212755183b592704de99fea5/silverscript-lang/tests/apps>
 
 ## Snapshot capabilities
 
@@ -62,6 +62,11 @@ deployment, compatibility, or mainnet-readiness questions.
   shadow contract fields, and non-numeric ordered comparisons. It also fixes
   fixed/dynamic array sizing and cast validation. Commit `5aa0886` adds the
   variable-input `g16.verify` Groth16 verifier built-in.
+- Commit `6f9e078` makes scalar byte/integer conversions explicit. `byte(...)`
+  accepts an existing scalar byte or an integer literal in `0..=255`; a runtime
+  integer uses checked `value as byte`. Scalar byte to integer conversion must
+  choose `signed(byteValue)` or `unsigned(byteValue)`, and scalar bytes cannot
+  participate directly in arithmetic operators.
 
 ## Terminology discipline
 

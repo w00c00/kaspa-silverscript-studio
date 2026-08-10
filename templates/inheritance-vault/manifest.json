@@ -23,6 +23,10 @@
   "risk": "advanced",
   "parameterEncodingVersion": 2,
   "sourceFile": "contract.sil",
+  "controlPrincipals": [
+    { "role": "owner", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "owner" },
+    { "role": "inheritors", "profile": "p2pk-schnorr/v1", "cardinalityParameter": "inheritors", "constructorParameter": "inheritors" }
+  ],
   "requiredReplacements": [0, 1, 2, 3],
   "parameters": [
     {

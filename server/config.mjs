@@ -8,7 +8,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(ROOT, ".env") });
 dotenv.config({ path: path.join(ROOT, ".env.local"), override: true });
 
-export const SILVERSCRIPT_COMMIT = "cb34aa5e6a598f9e461c4ad7014279ba89251d8d";
+export const SILVERSCRIPT_COMMIT = "6f9e078b1d8b5389212755183b592704de99fea5";
+export const SILVERSCRIPT_PREVIOUS_COMMIT = "cb34aa5e6a598f9e461c4ad7014279ba89251d8d";
 export const SILVERSCRIPT_LEGACY_COMMIT = "2a3961cadc76bb16a425042172ffe32481da89b5";
 
 export const NETWORKS = Object.freeze({
@@ -54,8 +55,13 @@ function loadCompilerConfig() {
     const legacyStored = !stored.profiles && definition.upstreamCommit === (stored.upstreamCommit || SILVERSCRIPT_LEGACY_COMMIT)
       ? stored
       : {};
-    const environmentBin = isLatest ? process.env.SILVERC_LATEST_BIN || process.env.SILVERC_BIN : process.env.SILVERC_LEGACY_BIN;
-    const environmentSha = isLatest ? process.env.SILVERC_LATEST_SHA256 || process.env.SILVERC_SHA256 : process.env.SILVERC_LEGACY_SHA256;
+    const isPrevious = definition.upstreamCommit === SILVERSCRIPT_PREVIOUS_COMMIT;
+    const environmentBin = isLatest
+      ? process.env.SILVERC_LATEST_BIN || process.env.SILVERC_BIN
+      : isPrevious ? process.env.SILVERC_PREVIOUS_BIN : process.env.SILVERC_LEGACY_BIN;
+    const environmentSha = isLatest
+      ? process.env.SILVERC_LATEST_SHA256 || process.env.SILVERC_SHA256
+      : isPrevious ? process.env.SILVERC_PREVIOUS_SHA256 : process.env.SILVERC_LEGACY_SHA256;
     return [definition.id, Object.freeze({
       ...definition,
       bin: path.resolve(environmentBin || local.bin || legacyStored.bin || path.join(ROOT, definition.binary)),
@@ -65,7 +71,7 @@ function loadCompilerConfig() {
   }));
   const defaultProfileId = profiles[stored.defaultProfileId]
     ? stored.defaultProfileId
-    : compatibility.defaultProfileId || "latest-cb34aa5";
+    : compatibility.defaultProfileId || "latest-6f9e078";
   return Object.freeze({
     defaultProfileId,
     profiles: Object.freeze(profiles),

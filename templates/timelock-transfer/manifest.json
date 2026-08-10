@@ -22,6 +22,10 @@
   "requirementsEn": "Allow the recipient to claim or the sender to refund after an absolute timeout.",
   "risk": "starter",
   "sourceFile": "contract.sil",
+  "controlPrincipals": [
+    { "role": "sender", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "sender" },
+    { "role": "recipient", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "recipient" }
+  ],
   "requiredReplacements": [0, 1, 2],
   "parameters": [
     { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.5", "minimum": "0.5", "labelZh": "锁定金额", "labelEn": "Locked amount", "helpZh": "至少 0.5 TKAS/KAS，以满足当前标准存储质量限制。", "helpEn": "At least 0.5 TKAS/KAS to stay within the current standard storage-mass limit." },

@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { NETWORKS } from "./config.mjs";
 import { sha256 } from "./security.mjs";
+import { buildCovenantDescriptor, caip2Network } from "./covenant-descriptor.mjs";
 
 const require = createRequire(import.meta.url);
 const kaspa = require("@kluster/kaspa-wasm");
@@ -89,15 +90,36 @@ export function buildAtomicCovenantPackage({ network: networkId = "tn10", covena
     const programHex = cleanHex(item.programHex);
     const script = utxo?.scriptPublicKey?.script || utxo?.entry?.scriptPublicKey?.script;
     if (String(script || "").toLowerCase() !== kaspa.payToScriptHashScript(programHex).script) throw builderError("Atomic covenant redeem program does not match its input UTXO");
+    const programSha256 = sha256(Buffer.from(programHex, "hex"));
+    const abi = item.abi;
+    const stateFields = item.stateFields || [];
+    const authorizationPrincipals = (item.arguments || []).map((argument, argumentIndex) => argument?.kind === "signature" ? {
+      role: `${item.entrypoint}.signature-${argumentIndex}`,
+      profile: "p2pk-schnorr/v1",
+      cardinality: 1,
+      reference: { kind: "public-key", value: argument.publicKey }
+    } : null).filter(Boolean);
+    const descriptor = buildCovenantDescriptor({
+      profileId: item.descriptorProfileId || `silverstudio/atomic-input-${index}/v1`,
+      network: networkId,
+      programSha256,
+      covenantId,
+      abi,
+      stateFields,
+      controlPrincipals: item.controlPrincipals || [],
+      authorizationPrincipals
+    });
     metadata.push({
       index,
       covenantId,
       programHex,
-      programSha256: sha256(Buffer.from(programHex, "hex")),
-      abi: item.abi,
-      stateFields: item.stateFields || [],
+      programSha256,
+      abi,
+      stateFields,
       entrypoint: item.entrypoint,
-      arguments: item.arguments || []
+      arguments: item.arguments || [],
+      descriptor: descriptor.descriptor,
+      descriptorSha256: descriptor.descriptorSha256
     });
     return {
       previousOutpoint: outpoint,
@@ -147,6 +169,7 @@ export function buildAtomicCovenantPackage({ network: networkId = "tn10", covena
   return {
     version: 1,
     network: network.id,
+    networkCaip2: caip2Network(network.id),
     transactionSafeJson: transaction.serializeToSafeJSON(),
     covenantInputs: metadata,
     ...(p2pkAuthorization?.metadata ? { p2pkAuthorization: { ...p2pkAuthorization.metadata, signed: false } } : {}),

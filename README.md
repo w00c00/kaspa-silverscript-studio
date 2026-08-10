@@ -35,8 +35,8 @@ AI 只负责生成候选方案和辅助审查，不能解锁钱包、签名交�
 - 中英文界面；首次启动自动读取系统语言，并在系统语言既非中文也非英文时使用时区辅助判断。
 - 用户手动切换语言后，本机选择优先于自动识别。
 - 本地项目工作区，可创建、切换和删除未使用的工作。
-- 双编译器兼容档案：默认固定 `kaspanet/silverscript@cb34aa5e6a598f9e461c4ad7014279ba89251d8d`，并保留 `2a3961c` 旧版用于复现；两者都校验二进制 SHA-256。
-- 内置破坏性变更扫描与安全迁移，识别 `entry`、`checkMsgSig`、`outpointTxId`、artifact `bytecode` 等升级差异；无法安全自动迁移的 `.reverse()` 和位运算会要求人工审查。
+- 三编译器兼容档案：默认固定 `kaspanet/silverscript@6f9e078b1d8b5389212755183b592704de99fea5`，保留 Studio 0.2.7 使用的 `cb34aa5` 和 `2a3961c` 旧版用于复现；三个二进制都校验 SHA-256。
+- 内置破坏性变更扫描与安全迁移，识别 `entry`、`checkMsgSig`、`outpointTxId`、artifact `bytecode` 和显式标量 byte/int 转换；无法安全自动迁移的 signed/unsigned 语义、`.reverse()` 和位运算会要求人工审查。
 - 固定 Kascov 来源提交构建的本地交易预检引擎。
 - 支持 OpenAI、Anthropic、Gemini、OpenRouter、Ollama 和 OpenAI-compatible 接口。
 - AI API Key 使用 scrypt 派生密钥和 AES-256-GCM 加密保存在本机。
@@ -45,6 +45,7 @@ AI 只负责生成候选方案和辅助审查，不能解锁钱包、签名交�
 - 支持 BIP39 附加密码；钱包密码和附加密码不会保存为普通偏好设置。
 - 支持 TN10 和 mainnet 自建 wRPC 节点，留空时使用公共节点发现。
 - 支持 `.ssinvite` 可携带操作包、跨设备顺序签名和外部 Covenant 交易包审查。
+- 新操作包携带 canonical v1 Covenant Descriptor，绑定 CAIP-2 网络、程序哈希、Covenant ID、ABI、状态布局和授权主体；旧包仍可读取但会标记缺少描述符。
 - 可替换 `CovenantStateSource` 会在原生 Covenant RPC、outpoint RPC 与 P2SH 地址索引之间回退，并重新验证 outpoint、Covenant ID、脚本和金额。
 - 通用 P2PK co-spend 授权只签指定普通钱包输入，并锁定整笔交易承诺；原子构建器支持 2–32 个不同 Covenant 输入。
 - Kascov 是首选可视化和第二份报告来源，但不是签名、预检或广播的运行依赖。
@@ -60,6 +61,7 @@ AI 只负责生成候选方案和辅助审查，不能解锁钱包、签名交�
 | 多继承人签到金库 | 所有者签到、所有者取回、到期分配 | 多继承人资产安排和定期续期 |
 | Merkle 一次性领取（TN10 Experimental） | Merkle 证明领取、超时退款 | 白名单领取和一次性票据 |
 | Commit / Reveal（TN10 Experimental） | Reveal 领取、超时退款 | 域隔离承诺和密封交付 |
+| Groth16 证明释放（TN10 Experimental） | ZK 证明领取 | 可验证计算结果付款；收款钱包固定 |
 | KCC721 四契约包（TN10 Experimental） | Collection、Ticket、NFT、Migration | Covenant 原生 NFT 研究；禁止普通单合约部署 |
 
 每个模板都包含：
@@ -223,6 +225,7 @@ OLLAMA_MODEL=
 仅有 Covenant ID 或 cov hash 不足以签名。外部操作包必须携带待签交易、UTXO、redeem program、ABI、入口、参数、输出和签名槽信息。详见 [可携带 Covenant 操作包](docs/portable-covenant-package.md)。
 
 编译器升级、状态查询与原子授权接口见 [Studio 0.2 架构说明](docs/studio-0.2-architecture.md)。KCC721 包的来源、边界和禁止事项见 [TN10 Experimental KCC721](docs/kcc721-experimental.md)。
+Kaspa x402 的网络标识、操作包映射和正式模板准入条件见 [TN10 Experimental x402 档案](docs/x402-experimental-profile.md)。
 
 ### 网络
 
@@ -290,8 +293,8 @@ AI is limited to candidate generation and review assistance. It cannot unlock wa
 - Chinese and English UI with automatic system-language detection and time-zone fallback.
 - A manual language choice always overrides future automatic detection.
 - Local project workspace with explicit create, switch, and delete actions.
-- Dual compiler profiles: the default is pinned to `kaspanet/silverscript@cb34aa5e6a598f9e461c4ad7014279ba89251d8d`, while `2a3961c` remains available for reproducible legacy builds; both binaries are SHA-256 verified.
-- Built-in breaking-change detection and safe migration for `entry`, `checkMsgSig`, `outpointTxId`, and artifact `bytecode`; removed `.reverse()` and bitwise typing changes require manual review.
+- Three compiler profiles: the default is pinned to `kaspanet/silverscript@6f9e078b1d8b5389212755183b592704de99fea5`; Studio 0.2.7's `cb34aa5` and legacy `2a3961c` remain reproducible, with SHA-256 verification for all binaries.
+- Built-in breaking-change detection and safe migration for `entry`, `checkMsgSig`, `outpointTxId`, artifact `bytecode`, and explicit scalar byte/int conversions; signedness, removed `.reverse()`, and bitwise typing changes require manual review.
 - Pinned Kascov-derived local transaction preflight engine.
 - OpenAI, Anthropic, Gemini, OpenRouter, Ollama, and OpenAI-compatible providers.
 - AES-256-GCM encrypted AI key vault with a scrypt-derived key.
@@ -299,6 +302,7 @@ AI is limited to candidate generation and review assistance. It cannot unlock wa
 - One-time mnemonic display and optional BIP39 passphrase support.
 - Direct TN10 and mainnet self-hosted wRPC endpoints with public-node discovery fallback.
 - Portable `.ssinvite` operation packages, sequential cross-device signing, and external covenant-package review.
+- Canonical v1 covenant descriptors bind each new package to its CAIP-2 network, program hash, covenant ID, ABI, state layout, and authorization principals; legacy packages remain readable with a visible missing-descriptor warning.
 - Replaceable `CovenantStateSource` fallback across native covenant RPC, outpoint RPC, and P2SH address indexing, with independent outpoint, covenant ID, script, and value verification.
 - Generic isolated P2PK co-spend authorization plus an atomic builder for 2–32 distinct covenant inputs.
 - Kascov is the preferred visual and secondary-report layer, not a signing, preflight, or broadcast dependency.
@@ -314,6 +318,7 @@ AI is limited to candidate generation and review assistance. It cannot unlock wa
 | Multi-inheritor check-in vault | Owner check-in, owner recovery, mature distribution | Inheritance planning with periodic renewal |
 | Merkle one-time claim (TN10 Experimental) | Merkle proof claim, timeout refund | Allowlists and single-use tickets |
 | Commit / reveal (TN10 Experimental) | Reveal claim, timeout refund | Domain-separated commitments and sealed delivery |
+| Groth16 proof release (TN10 Experimental) | ZK proof claim | Verifiable-computation payment to a fixed recipient |
 | Four-contract KCC721 pack (TN10 Experimental) | Collection, Ticket, NFT, Migration | Covenant-native NFT research; standalone deployment is blocked |
 
 Every template includes bilingual parameter forms and examples, deterministic constructor encoding, full compile verification, per-entrypoint transaction plans, and matching post-deployment builders.
@@ -451,6 +456,7 @@ Never have multiple signers sign separate initial copies. Compare the transactio
 A covenant ID or cov hash alone is not a signing request. An external package must include the exact transaction, UTXOs, redeem program, ABI, entrypoint, arguments, outputs, and signature slots. See [Portable covenant packages](docs/portable-covenant-package.md).
 
 See [Studio 0.2 architecture](docs/studio-0.2-architecture.md) for compiler upgrades, state sources, P2PK authorization, and atomic transaction APIs. See [TN10 Experimental KCC721](docs/kcc721-experimental.md) for provenance, boundaries, and prohibited release claims.
+See the [TN10 Experimental x402 profile](docs/x402-experimental-profile.md) for network identifiers, operation-package mapping, and executable-template admission gates.
 
 ### Networks
 

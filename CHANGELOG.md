@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.8 — 2026-08-10
+
+- Updated the default SHA-256-pinned official SilverScript compiler to `6f9e078b1d8b5389212755183b592704de99fea5`; retained `cb34aa5` for Studio 0.2.7 reproducibility and `2a3961c` for older projects.
+- Added breaking-change findings for explicit scalar byte/integer conversions: runtime integers use checked `as byte`, while scalar bytes require an explicit `signed()` or `unsigned()` interpretation.
+- Added canonical v1 covenant descriptors to generated lifecycle and atomic `.ssinvite` packages, binding CAIP-2 network, program hash, covenant ID, ABI, state layout, and authorization principals. Legacy packages remain readable with a visible warning.
+- Added a complete TN10 Experimental Groth16 proof-release template with deterministic parameters, exact fixed-recipient value conservation, bounded fees, an operation builder, local preflight, bilingual UX, and mainnet fail-closed policy.
+- Added a pinned Kaspa x402 alpha interoperability profile and explicit admission gates instead of exposing its pre-current-syntax escrow as a deployable template.
+- Recompiled every built-in template against `6f9e078` and expanded regression coverage for compiler migration, descriptor tampering, CAIP-2 aliases, Groth16 package construction, and legacy-package compatibility.
+
+## 0.2.8 — 2026-08-10（中文）
+
+- 默认官方 SilverScript 编译器升级并固定到 `6f9e078b1d8b5389212755183b592704de99fea5`；保留 `cb34aa5` 复现 Studio 0.2.7 项目，并保留 `2a3961c` 复现更早项目。
+- 增加标量 byte/int 显式转换的破坏性变更提示：运行时整数使用带检查的 `as byte`，标量 byte 转整数必须明确选择 `signed()` 或 `unsigned()`。
+- 新生成的生命周期与原子 `.ssinvite` 操作包加入 canonical v1 Covenant Descriptor，绑定 CAIP-2 网络、程序哈希、Covenant ID、ABI、状态布局和授权主体；旧包仍可读取，但会醒目标出缺少描述符。
+- 增加完整的 TN10 Experimental Groth16 证明释放模板，包含确定性参数、固定收款方精确价值守恒、手续费上限、操作构建器、本地预检、中英双语界面和主网失效关闭策略。
+- 增加固定提交的 Kaspa x402 alpha 互操作档案与正式模板准入条件，没有把仍使用旧语法的上游托管合约直接伪装成可部署模板。
+- 使用 `6f9e078` 重新编译全部内置模板，并扩展编译迁移、描述符篡改、CAIP-2 别名、Groth16 操作包和旧包兼容回归测试。
+
 ## 0.2.7 — 2026-08-09
 
 - Raised Studio's conservative covenant-cell default and minimum to 0.5 KAS/TKAS, preventing storage-mass rejection when funding a small covenant from a large faucet or mining UTXO.

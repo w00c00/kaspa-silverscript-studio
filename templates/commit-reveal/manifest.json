@@ -7,10 +7,14 @@
   "descriptionEn": "Deployment fixes a domain and commitment; the recipient reveals payload and salt to claim, or the sender refunds after timeout. TN10 experimental only.",
   "experimentalOnly": true,
   "networkAllowlist": ["tn10"],
-  "compilerProfileId": "latest-cb34aa5",
+  "compilerProfileId": "latest-6f9e078",
   "requirementsEn": "Release a whole escrow only when a domain-separated payload commitment is revealed, with an authenticated timeout refund.",
   "risk": "experimental",
   "sourceFile": "contract.sil",
+  "controlPrincipals": [
+    { "role": "sender", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "sender" },
+    { "role": "recipient", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "recipient" }
+  ],
   "requiredReplacements": [0, 1, 2, 3, 4],
   "parameters": [
     { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.5", "minimum": "0.5", "labelZh": "托管金额", "labelEn": "Escrow value", "helpZh": "至少 0.5 TKAS/KAS；Reveal 或退款时扣除显式矿工费后全额支付。", "helpEn": "At least 0.5 TKAS/KAS; reveal or refund pays the full balance minus the explicit miner fee." },

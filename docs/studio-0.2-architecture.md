@@ -4,9 +4,9 @@
 
 ### 编译器兼容档案
 
-`config/compiler-profiles.json` 是可提交的兼容性清单，`config/compiler.json` 是本机生成的二进制路径、构建时间和 SHA-256 清单。默认档案固定官方 SilverScript `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`，旧版 `2a3961cadc76bb16a425042172ffe32481da89b5` 只用于复现已有项目。
+`config/compiler-profiles.json` 是可提交的兼容性清单，`config/compiler.json` 是本机生成的二进制路径、构建时间和 SHA-256 清单。默认档案固定官方 SilverScript `6f9e078b1d8b5389212755183b592704de99fea5`；`cb34aa5` 保留用于复现 Studio 0.2.7 项目，`2a3961c` 保留用于更早的旧版项目。
 
-升级检查会报告已知变化，并只自动替换无歧义的名称。`.reverse()` 删除、字节序、位运算类型和任何状态布局变化必须人工审查。迁移后仍必须使用真实构造参数完整编译并进行对抗性交易测试。
+升级检查会报告已知变化，并只自动替换无歧义的名称。`6f9e078` 要求标量 byte 转 int 时明确使用 `signed()` 或 `unsigned()`，运行时 int 转 byte 使用 `as byte`；这些语义不能自动猜测。`.reverse()` 删除、字节序、位运算类型和任何状态布局变化也必须人工审查。迁移后仍必须使用真实构造参数完整编译并进行对抗性交易测试。
 
 接口：
 
@@ -21,6 +21,12 @@
 Studio 当前依次尝试：节点原生 Covenant ID 查询（节点支持时）、outpoint 查询（节点支持时）、P2SH 地址 UTXO 查询。以后可以加入本地索引器或其他节点适配器，但不能绕过最终验证。
 
 接口：`POST /api/covenants/resolve`。
+
+### 版本化 Covenant Descriptor
+
+Studio 新生成的 `.ssinvite` 为每个 Covenant 输入附带 canonical v1 descriptor。描述符固定 CAIP-2 网络、程序 SHA-256、Covenant ID、ABI 哈希、状态布局哈希、控制主体声明和本次授权主体，并单独提交 descriptor SHA-256。
+
+导入时会从交易 UTXO 和 redeem program 重新计算这些值。ABI、状态布局、网络、程序或 Covenant ID 任一不匹配都会拒绝操作包。旧版操作包仍可读取，但界面会明确显示 `legacy-missing`；描述符只提高元数据完整性，不能证明 redeem program 的业务语义。
 
 ### P2PK co-spend 授权
 
@@ -48,9 +54,9 @@ Studio 当前依次尝试：节点原生 Covenant ID 查询（节点支持时）
 
 ### Compiler compatibility profiles
 
-`config/compiler-profiles.json` is the committed compatibility catalog. The generated `config/compiler.json` records local binary paths, build times, and SHA-256 hashes. The default profile pins official SilverScript commit `cb34aa5e6a598f9e461c4ad7014279ba89251d8d`; `2a3961cadc76bb16a425042172ffe32481da89b5` is retained only for reproducible legacy builds.
+`config/compiler-profiles.json` is the committed compatibility catalog. The generated `config/compiler.json` records local binary paths, build times, and SHA-256 hashes. The default profile pins official SilverScript commit `6f9e078b1d8b5389212755183b592704de99fea5`; `cb34aa5` reproduces Studio 0.2.7 projects and `2a3961c` remains for older legacy projects.
 
-Compatibility checks report known changes and automatically apply only unambiguous renames. Removed `.reverse()`, byte ordering, bitwise typing, and any state-layout change require manual review. Every migration still requires a full compile with realistic constructor arguments and adversarial transaction tests.
+Compatibility checks report known changes and automatically apply only unambiguous renames. Commit `6f9e078` requires explicit `signed()`/`unsigned()` conversion from scalar byte and `as byte` for checked runtime int conversion; Studio never guesses that meaning. Removed `.reverse()`, byte ordering, bitwise typing, and state-layout changes also require manual review. Every migration still requires a full compile with realistic constructor arguments and adversarial transaction tests.
 
 Endpoints:
 
@@ -65,6 +71,12 @@ Endpoints:
 Studio currently tries native covenant-ID RPC when available, outpoint RPC when available, then P2SH-address UTXO lookup. Local indexers can be added later, but they cannot bypass final verification.
 
 Endpoint: `POST /api/covenants/resolve`.
+
+### Versioned covenant descriptor
+
+Every new `.ssinvite` includes a canonical v1 descriptor for each covenant input. It commits to the CAIP-2 network, program SHA-256, covenant ID, ABI hash, state-layout hash, declared control principals, and operation authorization principals, with a separate descriptor SHA-256.
+
+Import reconstructs these commitments from the transaction UTXO and redeem program. A mismatch in network, program, covenant ID, ABI, or state layout fails closed. Legacy packages remain readable but are visibly marked `legacy-missing`; a descriptor improves metadata integrity but does not prove redeem-program business semantics.
 
 ### P2PK co-spend authorization
 

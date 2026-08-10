@@ -113,6 +113,7 @@ jobs:
           PORT=4310 \
           STUDIO_DATA_DIR="$data_dir" \
           SILVERC_LATEST_BIN="$runtime/bin/silverc-latest" \
+          SILVERC_PREVIOUS_BIN="$runtime/bin/silverc-cb34aa5" \
           SILVERC_LEGACY_BIN="$runtime/bin/silverc-legacy" \
           KASCOV_PREFLIGHT_BIN="$runtime/bin/kascov-preflight" \
             "$node_bin" "$runtime/server/index.mjs" >"$log" 2>&1 &

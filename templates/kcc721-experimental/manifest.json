@@ -7,7 +7,7 @@
   "descriptionEn": "Guided Collection metadata, NFT identity and owner setup with a locally computed digest. Four covenants are included for TN10 research; ordinary deployment remains disabled.",
   "experimentalOnly": true,
   "networkAllowlist": ["tn10"],
-  "compilerProfileId": "latest-cb34aa5",
+  "compilerProfileId": "latest-6f9e078",
   "deploymentMode": "pack-only",
   "deploymentBlockedReason": "KCC721 is a four-contract TN10 experimental pack; its dedicated independently reviewed genesis/mint builder is not included yet, so standalone deployment is disabled",
   "requirementsEn": "Research UTXO-native NFTs whose immutable identity and current owner are enforced by a live covenant lineage.",

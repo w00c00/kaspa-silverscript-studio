@@ -6,7 +6,7 @@ Studio 内置的 KCC721 包改编自 `KaspaHUB21/KCC721` v0.2 社区草案，保
 
 本包只允许 `tn10`，风险等级为 `high-experimental`。普通单 Covenant 部署路径被明确禁用，因为 Collection/Ticket/NFT 创世需要专用的多合约 builder 正确计算模板片段、模板哈希、Covenant ID 和 output binding。当前完成的是：
 
-- 四份源码在官方 `silverc@cb34aa5` 下完整编译。
+- 四份源码在官方 `silverc@6f9e078` 下完整编译。
 - 模板使用三步配置向导，不再要求用户手填元数据摘要。名称、描述、图片 URI、外部链接和属性会先规范化为确定性 JSON，再由前后端分别计算并核对 SHA-256。
 - “新集合”明确标记为编译预览，内部使用不可部署的全零哨兵；只有“导入已有 TN10 集合”模式接受从真实创世输出核验的 Collection Covenant ID。
 - NFT 所有者变更绑定独立 P2PK co-spend 输入。
@@ -34,7 +34,7 @@ The bundled KCC721 pack is adapted from the community `KaspaHUB21/KCC721` v0.2 d
 
 The pack is restricted to `tn10` and marked `high-experimental`. Ordinary single-covenant deployment is explicitly blocked because Collection/Ticket/NFT genesis requires a dedicated multi-contract builder to calculate template segments, template hashes, covenant IDs, and output bindings correctly. The current implementation provides:
 
-- Full compilation of all four sources with official `silverc@cb34aa5`.
+- Full compilation of all four sources with official `silverc@6f9e078`.
 - A three-step setup wizard that no longer asks users to type a metadata digest. Name, description, image URI, external URL, and attributes are canonicalized into deterministic JSON, then SHA-256 is independently recomputed by the client and server.
 - A clearly labeled new-collection compile preview with a non-deployable internal all-zero sentinel. Only the existing-TN10-collection path accepts a Collection covenant ID verified from a real genesis output.
 - NFT ownership transitions bound to a separate P2PK co-spend input.

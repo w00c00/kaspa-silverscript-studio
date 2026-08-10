@@ -65,7 +65,7 @@ function lineAt(source, offset) {
 }
 
 function latestHardeningFindings(source, target) {
-  if (target.upstreamCommit !== "cb34aa5e6a598f9e461c4ad7014279ba89251d8d") return [];
+  if (!["cb34aa5e6a598f9e461c4ad7014279ba89251d8d", "6f9e078b1d8b5389212755183b592704de99fea5"].includes(target.upstreamCommit)) return [];
   const findings = [];
   const declarations = new Map();
   const functionPattern = /\b(?:entry|function)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
@@ -130,6 +130,51 @@ function latestHardeningFindings(source, target) {
       detected: true,
       messageZh: "有序比较现在只接受 int 或 byte；最新编译器会拒绝明显的字符串或布尔比较。",
       messageEn: "Ordered comparisons now accept only int or byte; the latest compiler rejects string or boolean comparisons."
+    });
+  }
+  return findings;
+}
+
+function scalarConversionFindings(source, target) {
+  if (target.upstreamCommit !== "6f9e078b1d8b5389212755183b592704de99fea5") return [];
+  const findings = [];
+  const scalarByteCast = /\bbyte\s*\(\s*([^()\n]+?)\s*\)/g;
+  let match;
+  while ((match = scalarByteCast.exec(source))) {
+    const argument = match[1].trim();
+    const decimal = argument.match(/^([0-9]+)$/);
+    const hex = argument.match(/^0x([0-9a-fA-F]+)$/);
+    const literal = decimal ? Number(decimal[1]) : hex ? Number.parseInt(hex[1], 16) : null;
+    if (Number.isSafeInteger(literal) && literal >= 0 && literal <= 255) continue;
+    findings.push({
+      id: "explicit-runtime-int-to-byte",
+      severity: "manual-review",
+      introducedBy: "6f9e078",
+      fromProfile: "latest-cb34aa5",
+      toProfile: target.id,
+      pattern: null,
+      replacement: null,
+      line: lineAt(source, match.index),
+      detected: true,
+      messageZh: "byte(...) 现在只接受 byte 或 0..255 整数字面量；若参数是运行时 int，请人工改为 value as byte 并确认 128 等值会按脚本数编码在运行时失败。",
+      messageEn: "byte(...) now accepts only byte values or integer literals in 0..255. For a runtime int, review and use value as byte, noting that script-number encoding rejects values such as 128 at runtime."
+    });
+  }
+
+  const scalarIntCast = /\bint\s*\(\s*([A-Za-z_][A-Za-z0-9_.\[\]]*)\s*\)/g;
+  while ((match = scalarIntCast.exec(source))) {
+    findings.push({
+      id: "explicit-byte-signedness",
+      severity: "manual-review",
+      introducedBy: "6f9e078",
+      fromProfile: "latest-cb34aa5",
+      toProfile: target.id,
+      pattern: null,
+      replacement: null,
+      line: lineAt(source, match.index),
+      detected: true,
+      messageZh: "若 int(...) 的参数是标量 byte，最新编译器要求明确选择 signed(byteValue) 或 unsigned(byteValue)；必须根据协议含义人工判断。",
+      messageEn: "If this int(...) argument is a scalar byte, the latest compiler requires signed(byteValue) or unsigned(byteValue); choose manually from the protocol meaning."
     });
   }
   return findings;
@@ -225,6 +270,7 @@ export function detectBreakingChanges(source, targetProfileId = config.compiler.
     }
   }
   findings.push(...latestHardeningFindings(text, target));
+  findings.push(...scalarConversionFindings(text, target));
   const blockers = findings.filter((finding) => finding.severity === "error");
   return {
     targetProfileId: target.id,

@@ -1,0 +1,61 @@
+{
+  "order": 80,
+  "category": "zero-knowledge",
+  "titleZh": "Groth16 证明释放（TN10 Experimental）",
+  "titleEn": "Groth16 proof release (TN10 Experimental)",
+  "descriptionZh": "验证固定验证密钥和五个 32 字节公共输入对应的 Groth16 证明后，将全部资金减去显式手续费发送到固定收款钱包。",
+  "descriptionEn": "Verify a Groth16 proof against a fixed verifying key and five 32-byte public inputs, then pay the full value minus an explicit fee to a fixed recipient.",
+  "experimentalOnly": true,
+  "networkAllowlist": ["tn10"],
+  "compilerProfileId": "latest-6f9e078",
+  "descriptorProfileId": "silverstudio/groth16-proof-release/v1",
+  "requirementsEn": "Release funds only after the pinned Kaspa script engine accepts a Groth16 proof for the exact five configured public inputs.",
+  "risk": "experimental",
+  "sourceFile": "contract.sil",
+  "controlPrincipals": [
+    { "role": "recipient", "profile": "p2pk-schnorr/v1", "cardinality": 1, "constructorParameter": "recipient" }
+  ],
+  "requiredReplacements": [0, 1, 2, 3, 4, 5, 6],
+  "parameters": [
+    { "id": "amountKas", "type": "amount", "projectField": "deployAmount", "required": true, "default": "0.5", "minimum": "0.5", "labelZh": "锁定金额", "labelEn": "Locked amount", "helpZh": "仅限 TN10；证明成功后全额减去显式手续费支付。", "helpEn": "TN10 only; a valid proof pays the complete value minus the explicit fee." },
+    { "id": "verifyingKey", "type": "hexBytes", "argIndex": 0, "required": true, "minimumBytes": 1, "maximumBytes": 520, "labelZh": "Groth16 压缩验证密钥（十六进制）", "labelEn": "Compressed Groth16 verifying key (hex)", "placeholderZh": "粘贴 1–520 字节十六进制验证密钥", "placeholderEn": "Paste a 1–520 byte verifying key as hex", "helpZh": "必须来自可信电路构建流程；Studio 不会让 AI 生成验证密钥。", "helpEn": "Obtain this from the trusted circuit setup; Studio never asks AI to invent a verifying key." },
+    { "id": "publicInput0", "type": "sha256", "argIndex": 1, "required": true, "labelZh": "公共输入 1", "labelEn": "Public input 1", "helpZh": "五个输入的顺序必须与电路完全一致。", "helpEn": "The five inputs must follow the circuit's exact order." },
+    { "id": "publicInput1", "type": "sha256", "argIndex": 2, "required": true, "labelZh": "公共输入 2", "labelEn": "Public input 2" },
+    { "id": "publicInput2", "type": "sha256", "argIndex": 3, "required": true, "labelZh": "公共输入 3", "labelEn": "Public input 3" },
+    { "id": "publicInput3", "type": "sha256", "argIndex": 4, "required": true, "labelZh": "公共输入 4", "labelEn": "Public input 4" },
+    { "id": "publicInput4", "type": "sha256", "argIndex": 5, "required": true, "labelZh": "公共输入 5", "labelEn": "Public input 5" },
+    { "id": "recipientAddress", "type": "address", "argIndex": 6, "required": true, "labelZh": "固定收款钱包", "labelEn": "Fixed recipient wallet", "placeholderZh": "kaspatest:...", "placeholderEn": "kaspatest:...", "helpZh": "任何人都可以提交有效证明，但资金只能进入这个钱包。", "helpEn": "Anyone may submit a valid proof, but funds can only reach this wallet." }
+  ],
+  "constructorArgs": [
+    { "kind": "byte[]", "data": [1] },
+    { "kind": "bytes32", "hex": "1111111111111111111111111111111111111111111111111111111111111111" },
+    { "kind": "bytes32", "hex": "2222222222222222222222222222222222222222222222222222222222222222" },
+    { "kind": "bytes32", "hex": "3333333333333333333333333333333333333333333333333333333333333333" },
+    { "kind": "bytes32", "hex": "4444444444444444444444444444444444444444444444444444444444444444" },
+    { "kind": "bytes32", "hex": "5555555555555555555555555555555555555555555555555555555555555555" },
+    { "kind": "pubkey", "hex": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798" }
+  ],
+  "invariants": [
+    "The Groth16 verifier uses the exact constructor-bound verifying key and five ordered public inputs",
+    "The operation has one covenant input and one fixed P2PK recipient output",
+    "The recipient receives input value minus a positive fee capped at 0.1 KAS/TKAS",
+    "No signature or AI decision can substitute for a valid proof"
+  ],
+  "transactionPlans": [
+    { "transition": "claim", "inputs": [{ "role": "proof-locked-funds", "index": 0 }], "outputs": [{ "role": "fixed-recipient", "index": 0 }], "conservationChecks": ["g16.verify accepts the proof", "input = recipient output + explicit fee"] }
+  ],
+  "example": {
+    "titleZh": "可验证计算结果付款",
+    "titleEn": "Payment for a verifiable computation result",
+    "scenarioZh": "发布方锁定 TN10 资金并固定电路验证密钥、五个公共输入和收款钱包；提交者给出有效 Groth16 证明后触发付款。",
+    "scenarioEn": "A publisher locks TN10 funds and fixes a circuit verifying key, five public inputs and a recipient; a valid Groth16 proof releases the payment.",
+    "rolesZh": ["发布方：核对电路、验证密钥和五个公共输入后部署", "证明方：在本地生成证明并提交十六进制证明数据", "收款方：由构造参数固定，不能在领取时更换"],
+    "rolesEn": ["Publisher: reviews the circuit, verifying key and five public inputs before deployment", "Prover: generates the proof locally and submits its hex encoding", "Recipient: fixed at construction and cannot be replaced during claiming"],
+    "stepsZh": ["从可信电路工具导出压缩验证密钥和五个有序公共输入", "在 TN10 部署并核对编译器提交和程序哈希", "生成证明，在操作中心构建 claim", "本地脚本引擎验证通过后再广播"],
+    "stepsEn": ["Export the compressed verifying key and five ordered public inputs from a trusted circuit tool", "Deploy on TN10 and verify compiler commit and program hash", "Generate the proof and build claim in Operation Center", "Broadcast only after the local script engine verifies it"],
+    "resultZh": "链上脚本验证证明；应用、网站和 AI 都没有放行资金的权力。",
+    "resultEn": "The on-chain script verifies the proof; the app, website and AI cannot authorize release.",
+    "cautionZh": "这是未经独立审计的 TN10 研究模板。验证密钥或公共输入配置错误会永久锁定资金。",
+    "cautionEn": "This is an unaudited TN10 research template. A wrong verifying key or public input can lock funds permanently."
+  }
+}

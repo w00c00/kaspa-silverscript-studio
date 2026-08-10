@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { NETWORKS } from "./config.mjs";
 import { finalizeExternalCovenantPackage, inspectExternalCovenantPackage } from "./external-covenant-service.mjs";
 import { findCovenantUtxo, kasToSompi, kascovPreflight, sompiToKas } from "./kaspa-service.mjs";
+import { buildCovenantDescriptor, caip2Network } from "./covenant-descriptor.mjs";
 
 const require = createRequire(import.meta.url);
 const kaspa = require("@kluster/kaspa-wasm");
@@ -41,6 +42,9 @@ const OPERATIONS = {
   "commit-reveal": [
     { id: "reveal", titleZh: "公开承诺原文领取", titleEn: "Reveal committed payload", payload: true, salt: true },
     { id: "refund", titleZh: "到期退款", titleEn: "Timeout refund" }
+  ],
+  "groth16-proof-release": [
+    { id: "claim", titleZh: "提交 Groth16 证明释放", titleEn: "Release with Groth16 proof", proof: true, proofKind: "groth16" }
   ]
 };
 
@@ -125,6 +129,18 @@ function timeoutOf(project, templateId) {
   const value = Number(project.constructorArgs?.[index]?.data);
   if (!Number.isSafeInteger(value) || value <= 0) throw operationError("Compiled timeout constructor argument is invalid");
   return value;
+}
+
+function controlPrincipalsOf(template, project) {
+  return (Array.isArray(template.controlPrincipals) ? template.controlPrincipals : []).map((principal) => {
+    const normalized = { ...principal };
+    if (principal.cardinalityParameter) {
+      const value = project.templateParameters?.[principal.cardinalityParameter];
+      normalized.cardinality = Array.isArray(value) ? value.length : 0;
+      delete normalized.cardinalityParameter;
+    }
+    return normalized;
+  });
 }
 
 function inheritOutputs(parameters, value, network) {
@@ -256,6 +272,11 @@ export async function buildTemplateOperationPackage(
       sigOps = 1;
       lockTime = BigInt(timeoutOf(project, templateId));
     }
+  } else if (templateId === "groth16-proof-release") {
+    const identity = publicKeyOf(parameters.recipientAddress, network);
+    const proofHex = operationHex(input.proofHex, "Groth16 proof", { minimumBytes: 1, maximumBytes: 520 });
+    outputs = [new kaspa.TransactionOutput(payout, kaspa.payToAddressScript(identity.address))];
+    args = [bytesArgument(proofHex), int(fee)];
   } else if (templateId === "commit-reveal") {
     const isReveal = operation.id === "reveal";
     const identity = publicKeyOf(isReveal ? parameters.recipientAddress : parameters.senderAddress, network);
@@ -293,9 +314,28 @@ export async function buildTemplateOperationPackage(
     gas: 0n,
     payload: ""
   });
+  const authorizationPrincipals = args
+    .map((argument, index) => argument?.kind === "signature" ? {
+      role: `${operation.id}.signature-${index}`,
+      profile: "p2pk-schnorr/v1",
+      cardinality: 1,
+      reference: { kind: "public-key", value: argument.publicKey }
+    } : null)
+    .filter(Boolean);
+  const descriptor = buildCovenantDescriptor({
+    profileId: template.descriptorProfileId || `silverstudio/${templateId}/v1`,
+    network: project.network,
+    programSha256: project.artifact.programSha256,
+    covenantId: source.covenantId,
+    abi: project.artifact.abi,
+    stateFields: project.artifact.stateFields || [],
+    controlPrincipals: controlPrincipalsOf(template, project),
+    authorizationPrincipals
+  });
   const packageValue = {
     version: 1,
     network: project.network,
+    networkCaip2: caip2Network(project.network),
     transactionSafeJson: transaction.serializeToSafeJSON(),
     covenantInput: {
       index: 0,
@@ -304,7 +344,9 @@ export async function buildTemplateOperationPackage(
       programSha256: project.artifact.programSha256,
       abi: project.artifact.abi,
       entrypoint: operation.id,
-      arguments: args
+      arguments: args,
+      descriptor: descriptor.descriptor,
+      descriptorSha256: descriptor.descriptorSha256
     },
     provenance: {
       kind: "silverstudio-template-operation",

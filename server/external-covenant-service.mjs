@@ -6,6 +6,7 @@ import { config, NETWORKS } from "./config.mjs";
 import { sha256, transactionCommitment } from "./security.mjs";
 import { kascovPreflight, sompiToKas } from "./kaspa-service.mjs";
 import { operationPresentation } from "./operation-metadata.mjs";
+import { caip2Network, normalizePackageNetwork, verifyCovenantDescriptor } from "./covenant-descriptor.mjs";
 
 const require = createRequire(import.meta.url);
 const kaspa = require("@kluster/kaspa-wasm");
@@ -23,7 +24,13 @@ function parsePackage(input) {
   let parsed;
   try { parsed = typeof input === "string" ? JSON.parse(input) : structuredClone(input || {}); } catch { throw packageError("External covenant package is not valid JSON"); }
   if (parsed.version !== 1) throw packageError("External covenant package version must be 1");
+  const originalNetwork = parsed.network;
+  parsed.network = normalizePackageNetwork(parsed.network);
   if (!NETWORKS[parsed.network]) throw packageError("External covenant package network is unsupported");
+  const expectedCaip2 = caip2Network(parsed.network);
+  if (parsed.networkCaip2 && parsed.networkCaip2 !== expectedCaip2) throw packageError("External covenant package CAIP-2 network does not match its network");
+  parsed.networkCaip2 = expectedCaip2;
+  if (originalNetwork !== parsed.network) parsed.networkAlias = String(originalNetwork);
   if (typeof parsed.transactionSafeJson !== "string") parsed.transactionSafeJson = JSON.stringify(parsed.transactionSafeJson || {});
   const metadata = Array.isArray(parsed.covenantInputs)
     ? parsed.covenantInputs
@@ -106,12 +113,23 @@ function normalizedCovenant(transaction, metadata) {
     }
   }
   const stateFields = selected.inputs.some((input) => input.type_name === "State") ? cleanStateFields(metadata.stateFields) : [];
-  return { input, inputIndex, programHex, covenantId, abi, selected, argumentsList, stateFields };
+  const programSha256 = sha256(Buffer.from(programHex, "hex"));
+  const descriptor = metadata.descriptor
+    ? verifyCovenantDescriptor(metadata.descriptor, {
+      network: metadata.network || "",
+      programSha256,
+      covenantId,
+      abi,
+      stateFields,
+      descriptorSha256: metadata.descriptorSha256
+    })
+    : null;
+  return { input, inputIndex, programHex, programSha256, covenantId, abi, selected, argumentsList, stateFields, descriptor };
 }
 
 function normalized(pkg) {
   const transaction = transactionFrom(pkg);
-  const covenants = pkg.covenantInputs.map((metadata) => normalizedCovenant(transaction, metadata));
+  const covenants = pkg.covenantInputs.map((metadata) => normalizedCovenant(transaction, { ...metadata, network: pkg.network }));
   if (new Set(covenants.map((item) => item.inputIndex)).size !== covenants.length) throw packageError("Covenant metadata records must target different transaction inputs");
   let inputTotal = 0n;
   for (const item of transaction.inputs) {
@@ -248,7 +266,11 @@ export function inspectExternalCovenantPackage(input) {
     covenantId: covenant.covenantId,
     abi: covenant.abi,
     arguments: covenant.argumentsList,
-    stateFields: covenant.stateFields
+    stateFields: covenant.stateFields,
+    ...(covenant.descriptor ? {
+      descriptor: covenant.descriptor.descriptor,
+      descriptorSha256: covenant.descriptor.descriptorSha256
+    } : {})
   }));
   const p2pkSigned = !p2pkAuthorization || p2pkAuthorization.signed;
   const operation = operationPresentation({
@@ -287,15 +309,21 @@ export function inspectExternalCovenantPackage(input) {
       covenantInputs: resolved.covenants.map((item) => ({
         transactionInputIndex: item.inputIndex,
         covenantId: item.covenantId,
-        programSha256: sha256(Buffer.from(item.programHex, "hex")),
+        programSha256: item.programSha256,
         entrypoint: item.selected.name,
-        signatureCount: signatureSlots(item.selected, item.argumentsList).length
+        signatureCount: signatureSlots(item.selected, item.argumentsList).length,
+        descriptorStatus: item.descriptor ? "verified-v1" : "legacy-missing",
+        descriptorSha256: item.descriptor?.descriptorSha256 || ""
       })),
+      descriptorStatus: resolved.covenants.every((item) => item.descriptor) ? "verified-v1" : "legacy-missing",
+      descriptorSha256: resolved.descriptor?.descriptorSha256 || "",
       p2pkAuthorization,
       operation,
       atomic: resolved.covenants.length > 1,
       complete: slots.every((slot) => slot.signed) && p2pkSigned,
-      warning: "The supplied ABI is metadata, not proof of the redeem program semantics. Review trusted source/artifact provenance before signing."
+      warning: resolved.covenants.every((item) => item.descriptor)
+        ? "The versioned descriptor and ABI commitments match this package, but metadata still does not prove redeem-program semantics. Review trusted source/artifact provenance before signing."
+        : "Legacy package: no versioned descriptor is present. The supplied ABI is metadata, not proof of redeem-program semantics; review trusted source/artifact provenance before signing."
     }
   };
 }

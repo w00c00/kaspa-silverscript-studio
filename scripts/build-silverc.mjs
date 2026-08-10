@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 import { cargoReleaseBinary, executableName, makeExecutable } from "./platform-binaries.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const latestCommit = "cb34aa5e6a598f9e461c4ad7014279ba89251d8d";
+const latestCommit = "6f9e078b1d8b5389212755183b592704de99fea5";
+const previousCommit = "cb34aa5e6a598f9e461c4ad7014279ba89251d8d";
 const legacyCommit = "2a3961cadc76bb16a425042172ffe32481da89b5";
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "silverstudio-silverc-"));
 
@@ -55,10 +56,16 @@ function buildProfile({ id, commit, outputName, configuredSource }) {
 try {
   fs.mkdirSync(path.join(root, "config"), { recursive: true });
   const latestBin = buildProfile({
-    id: "latest-cb34aa5",
+    id: "latest-6f9e078",
     commit: latestCommit,
     outputName: "silverc-latest",
     configuredSource: process.env.SILVERSCRIPT_LATEST_SOURCE || process.env.SILVERSCRIPT_SOURCE || ""
+  });
+  const previousBin = buildProfile({
+    id: "latest-cb34aa5",
+    commit: previousCommit,
+    outputName: "silverc-cb34aa5",
+    configuredSource: process.env.SILVERSCRIPT_PREVIOUS_SOURCE || ""
   });
   const legacyBin = buildProfile({
     id: "legacy-2a3961c",
@@ -67,14 +74,21 @@ try {
     configuredSource: process.env.SILVERSCRIPT_LEGACY_SOURCE || ""
   });
   const latestSha256 = sha256(latestBin);
+  const previousSha256 = sha256(previousBin);
   const legacySha256 = sha256(legacyBin);
   const manifest = {
-    defaultProfileId: "latest-cb34aa5",
+    defaultProfileId: "latest-6f9e078",
     profiles: {
-      "latest-cb34aa5": {
+      "latest-6f9e078": {
         bin: latestBin,
         sha256: latestSha256,
         upstreamCommit: latestCommit,
+        builtAt: new Date().toISOString()
+      },
+      "latest-cb34aa5": {
+        bin: previousBin,
+        sha256: previousSha256,
+        upstreamCommit: previousCommit,
         builtAt: new Date().toISOString()
       },
       "legacy-2a3961c": {
@@ -87,9 +101,12 @@ try {
   };
   fs.writeFileSync(path.join(root, "config", "compiler.json"), `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
   run(latestBin, ["--help"]);
+  run(previousBin, ["--help"]);
   run(legacyBin, ["--help"]);
   console.log(`latest silverc commit: ${latestCommit}`);
   console.log(`latest silverc sha256: ${latestSha256}`);
+  console.log(`previous silverc commit: ${previousCommit}`);
+  console.log(`previous silverc sha256: ${previousSha256}`);
   console.log(`legacy silverc commit: ${legacyCommit}`);
   console.log(`legacy silverc sha256: ${legacySha256}`);
   console.log(`manifest: ${path.join(root, "config", "compiler.json")}`);
